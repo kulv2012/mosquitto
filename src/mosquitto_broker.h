@@ -60,8 +60,8 @@ struct _mqtt3_listener {
 	uint16_t port;
 	int max_connections;
 	char *mount_point;
-	int *socks;
-	int sock_count;
+	int *socks;//由于可能hostname为域名等，一条listener可能需要花费多个sock套接字句柄，所以为数组.所有的sock放在main()的局部变量listensock上面
+	int sock_count;//上面socks数组的个数
 	int client_count;
 #ifdef WITH_TLS
 	char *cafile;

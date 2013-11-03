@@ -135,8 +135,8 @@ struct mosquitto {
 	time_t ping_t;
 	uint16_t last_mid;
 	struct _mosquitto_packet in_packet;
-	struct _mosquitto_packet *current_out_packet;
-	struct _mosquitto_packet *out_packet;
+	struct _mosquitto_packet *current_out_packet;//当前正在发送中的数据包，可能只发送了一部分
+	struct _mosquitto_packet *out_packet;//待发送出去的包的链表
 	struct mosquitto_message *will;
 #ifdef WITH_TLS
 	SSL *ssl;
