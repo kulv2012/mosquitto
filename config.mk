@@ -92,10 +92,10 @@ ifeq ($(UNAME),SunOS)
 	ifeq ($(CC),cc)
 		CFLAGS?=-O
 	else
-		CFLAGS?=-Wall -ggdb -O2
+		CFLAGS?=-Wall -ggdb # -O2
 	endif
 else
-	CFLAGS?=-Wall -ggdb -O2
+	CFLAGS?=-Wall -ggdb -g # -O2
 endif
 
 LIB_CFLAGS:=${CFLAGS} ${CPPFLAGS} -I. -I.. -I../lib
