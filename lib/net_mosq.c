@@ -690,7 +690,7 @@ ssize_t _mosquitto_net_write(struct mosquitto *mosq, void *buf, size_t count)
 }
 
 int _mosquitto_packet_write(struct mosquitto *mosq)
-{
+{//loop_handle_reads_writes等调用这里尝试将mosq->out_packet上的数据发送出去,用简单write的方式。后续可以优化为writev
 	ssize_t write_length;
 	struct _mosquitto_packet *packet;
 
@@ -699,7 +699,7 @@ int _mosquitto_packet_write(struct mosquitto *mosq)
 
 	pthread_mutex_lock(&mosq->current_out_packet_mutex);
 	pthread_mutex_lock(&mosq->out_packet_mutex);
-	if(mosq->out_packet && !mosq->current_out_packet){
+	if(mosq->out_packet && !mosq->current_out_packet){//这里说明当前的这个包已经发送完成了，需要从out_packet获取一个
 		mosq->current_out_packet = mosq->out_packet;
 		mosq->out_packet = mosq->out_packet->next;
 		if(!mosq->out_packet){
@@ -711,7 +711,7 @@ int _mosquitto_packet_write(struct mosquitto *mosq)
 	while(mosq->current_out_packet){
 		packet = mosq->current_out_packet;
 
-		while(packet->to_process > 0){
+		while(packet->to_process > 0){//当前这个包还没有发送完成,继续发送packet->pos后面的部分，总共还有to_process
 			write_length = _mosquitto_net_write(mosq, &(packet->payload[packet->pos]), packet->to_process);
 			if(write_length > 0){
 #if defined(WITH_BROKER) && defined(WITH_SYS_TREE)
@@ -723,10 +723,11 @@ int _mosquitto_packet_write(struct mosquitto *mosq)
 #ifdef WIN32
 				errno = WSAGetLastError();
 #endif
+				//发送失败，如果返回EAGAIN，那解锁，下回再来
 				if(errno == EAGAIN || errno == COMPAT_EWOULDBLOCK){
 					pthread_mutex_unlock(&mosq->current_out_packet_mutex);
 					return MOSQ_ERR_SUCCESS;
-				}else{
+				}else{//挂了
 					pthread_mutex_unlock(&mosq->current_out_packet_mutex);
 					switch(errno){
 						case COMPAT_ECONNRESET:
@@ -738,6 +739,7 @@ int _mosquitto_packet_write(struct mosquitto *mosq)
 			}
 		}
 
+		//到这里，肯定当前的current_out_packet上的数据包已经刚好发送完毕了。
 #ifdef WITH_BROKER
 #  ifdef WITH_SYS_TREE
 		g_msgs_sent++;
@@ -748,7 +750,7 @@ int _mosquitto_packet_write(struct mosquitto *mosq)
 #else
 		if(((packet->command)&0xF6) == PUBLISH){
 			pthread_mutex_lock(&mosq->callback_mutex);
-			if(mosq->on_publish){
+			if(mosq->on_publish){//如果是客户端代码运行这里，则需要on_publish回调一下上层应用方
 				/* This is a QoS=0 message */
 				mosq->in_callback = true;
 				mosq->on_publish(mosq, mosq->userdata, packet->mid);
@@ -760,7 +762,7 @@ int _mosquitto_packet_write(struct mosquitto *mosq)
 
 		/* Free data and reset values */
 		pthread_mutex_lock(&mosq->out_packet_mutex);
-		mosq->current_out_packet = mosq->out_packet;
+		mosq->current_out_packet = mosq->out_packet;//继续处理下一个
 		if(mosq->out_packet){
 			mosq->out_packet = mosq->out_packet->next;
 			if(!mosq->out_packet){
@@ -806,7 +808,7 @@ int _mosquitto_packet_read(struct mosquitto *mosq)
 	 * After all data is read, send to _mosquitto_handle_packet() to deal with.
 	 * Finally, free the memory and reset everything to starting conditions.
 	 */
-	if(!mosq->in_packet.command){
+	if(!mosq->in_packet.command){//还没有读取一个字节，所以先读取头部
 		read_length = _mosquitto_net_read(mosq, &byte, 1);
 		if(read_length == 1){
 			mosq->in_packet.command = byte;
@@ -817,7 +819,7 @@ int _mosquitto_packet_read(struct mosquitto *mosq)
 			/* Clients must send CONNECT as their first command. */
 			if(!(mosq->bridge) && mosq->state == mosq_cs_new && (byte&0xF0) != CONNECT) return MOSQ_ERR_PROTOCOL;
 #endif
-		}else{
+		}else{//出错了或者暂时没有数据可读
 			if(read_length == 0) return MOSQ_ERR_CONN_LOST; /* EOF */
 #ifdef WIN32
 			errno = WSAGetLastError();
@@ -834,7 +836,7 @@ int _mosquitto_packet_read(struct mosquitto *mosq)
 			}
 		}
 	}
-	if(!mosq->in_packet.have_remaining){
+	if(!mosq->in_packet.have_remaining){//还没有读取到remaining length
 		/* Read remaining
 		 * Algorithm for decoding taken from pseudo code at
 		 * http://publib.boulder.ibm.com/infocenter/wmbhelp/v6r0m0/topic/com.ibm.etools.mft.doc/ac10870_.htm
@@ -871,14 +873,14 @@ int _mosquitto_packet_read(struct mosquitto *mosq)
 			}
 		}while((byte & 128) != 0);
 
-		if(mosq->in_packet.remaining_length > 0){
+		if(mosq->in_packet.remaining_length > 0){//为负载数据申请内存
 			mosq->in_packet.payload = _mosquitto_malloc(mosq->in_packet.remaining_length*sizeof(uint8_t));
 			if(!mosq->in_packet.payload) return MOSQ_ERR_NOMEM;
-			mosq->in_packet.to_process = mosq->in_packet.remaining_length;
+			mosq->in_packet.to_process = mosq->in_packet.remaining_length;//还有这么多数据没有读取完
 		}
 		mosq->in_packet.have_remaining = 1;
 	}
-	while(mosq->in_packet.to_process>0){
+	while(mosq->in_packet.to_process>0){//循环读取后面的负载数据。要么读取一部分后返回，要么全部读取到
 		read_length = _mosquitto_net_read(mosq, &(mosq->in_packet.payload[mosq->in_packet.pos]), mosq->in_packet.to_process);
 		if(read_length > 0){
 #if defined(WITH_BROKER) && defined(WITH_SYS_TREE)

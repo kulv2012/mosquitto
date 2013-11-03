@@ -310,6 +310,7 @@ static void print_usage(void)
 	printf("\nSee http://mosquitto.org/ for more information.\n\n");
 }
 
+//k: parse argc/argv, call mqtt3_config_read to load config file
 int mqtt3_config_parse_args(struct mqtt3_config *config, int argc, char *argv[])
 {
 	int i;
@@ -364,6 +365,7 @@ int mqtt3_config_parse_args(struct mqtt3_config *config, int argc, char *argv[])
 		}
 	}
 
+	//k: no listen info set ,use old one 
 	if(config->listener_count == 0
 #ifdef WITH_TLS
 			|| config->default_listener.cafile
@@ -518,6 +520,7 @@ int mqtt3_config_read(struct mqtt3_config *config, bool reload)
 	return MOSQ_ERR_SUCCESS;
 }
 
+//k: fopen config file , process line by line
 int _config_read_file(struct mqtt3_config *config, bool reload, const char *file, struct config_recurse *cr, int level, int *lineno)
 {
 	int rc;

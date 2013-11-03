@@ -604,7 +604,7 @@ int mqtt3_db_message_reconnect_reset(struct mosquitto *context)
 }
 
 int mqtt3_db_message_timeout_check(struct mosquitto_db *db, unsigned int timeout)
-{
+{//循环遍历每一个连接的每个消息msg,看起是否超时，如果超时，将消息状态改为上一个状态，从而后续触发重发
 	int i;
 	time_t threshold;
 	enum mosquitto_msg_state new_state = mosq_ms_invalid;
@@ -613,12 +613,13 @@ int mqtt3_db_message_timeout_check(struct mosquitto_db *db, unsigned int timeout
 
 	threshold = mosquitto_time() - timeout;
 	
-	for(i=0; i<db->context_count; i++){
+	for(i=0; i<db->context_count; i++){//遍历每一个连接，
 		context = db->contexts[i];
 		if(!context) continue;
 
 		msg = context->msgs;
-		while(msg){
+		while(msg){//遍历每个msg消息，看看其状态，如果超时了，那么从上一个消息开始重发.其实不需要重发http://chenzhenianqing.cn/articles/977.html
+			//当然如果这个是复用了之前断开过的连接，那就需要重发。但是，这个时候其实可以重发整个消息的。不然容易出问题，客户端难度大
 			if(msg->timestamp < threshold && msg->state != mosq_ms_queued){
 				switch(msg->state){
 					case mosq_ms_wait_for_puback:
@@ -637,9 +638,9 @@ int mqtt3_db_message_timeout_check(struct mosquitto_db *db, unsigned int timeout
 						break;
 				}
 				if(new_state != mosq_ms_invalid){
-					msg->timestamp = mosquitto_time();
-					msg->state = new_state;
-					msg->dup = true;
+					msg->timestamp = mosquitto_time();//设置当前时间，下次依据来判断超时
+					msg->state = new_state;//修改状态为上一次的状态
+					msg->dup = true;//设置重发标志
 				}
 			}
 			msg = msg->next;

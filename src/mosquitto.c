@@ -186,11 +186,11 @@ int main(int argc, char *argv[])
 	_mosquitto_net_init();
 
 	mqtt3_config_init(&config);
-	rc = mqtt3_config_parse_args(&config, argc, argv);
+	rc = mqtt3_config_parse_args(&config, argc, argv);//k: init && load config file, set struct members
 	if(rc != MOSQ_ERR_SUCCESS) return rc;
 	int_db.config = &config;
 
-	if(config.daemon){
+	if(config.daemon){//k: fork() goto deamon mode
 #ifndef WIN32
 		switch(fork()){
 			case 0:
@@ -207,7 +207,7 @@ int main(int argc, char *argv[])
 #endif
 	}
 
-	if(config.daemon && config.pid_file){
+	if(config.daemon && config.pid_file){//write pid file
 		pid = _mosquitto_fopen(config.pid_file, "wt");
 		if(pid){
 			fprintf(pid, "%d", getpid());

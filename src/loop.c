@@ -110,7 +110,7 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 		memset(pollfds, -1, sizeof(struct pollfd)*pollfd_count);
 
 		pollfd_index = 0;
-		for(i=0; i<listensock_count; i++){
+		for(i=0; i<listensock_count; i++){//注册监听sock的pollfd可读事件。也就是新连接事件
 			pollfds[pollfd_index].fd = listensock[i];
 			pollfds[pollfd_index].events = POLLIN;
 			pollfds[pollfd_index].revents = 0;
@@ -118,9 +118,9 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 		}
 
 		time_count = 0;
-		for(i=0; i<db->context_count; i++){
+		for(i=0; i<db->context_count; i++){//遍历每一个客户端连接,尝试将其加入poll数组中
 			if(db->contexts[i]){
-				if(time_count > 0){
+				if(time_count > 0){//time_count用来隔1000次循环更新一次now时间
 					time_count--;
 				}else{
 					time_count = 1000;
@@ -151,6 +151,7 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 							|| db->contexts[i]->bridge
 							|| now - db->contexts[i]->last_msg_in < (time_t)(db->contexts[i]->keepalive)*3/2){
 
+						//在进入poll等待之前，先尝试将未发送的数据发送出去
 						if(mqtt3_db_message_write(db->contexts[i]) == MOSQ_ERR_SUCCESS){
 							pollfds[pollfd_index].fd = db->contexts[i]->sock;
 							pollfds[pollfd_index].events = POLLIN | POLLRDHUP;
@@ -160,17 +161,17 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 							}
 							db->contexts[i]->pollfd_index = pollfd_index;
 							pollfd_index++;
-						}else{
+						}else{//尝试发送失败，连接出问题了
 							mqtt3_context_disconnect(db, db->contexts[i]);
 						}
-					}else{
+					}else{//超过1.5倍的时间，超时关闭连接
 						if(db->config->connection_messages == true){
 							_mosquitto_log_printf(NULL, MOSQ_LOG_NOTICE, "Client %s has exceeded timeout, disconnecting.", db->contexts[i]->id);
 						}
 						/* Client has exceeded keepalive*1.5 */
-						mqtt3_context_disconnect(db, db->contexts[i]);
+						mqtt3_context_disconnect(db, db->contexts[i]);//关闭连接，清空数据，后续还可以用.sock=INVALID_SOCKET 
 					}
-				}else{
+				}else{//db->contexts[i]->sock == INVALID_SOCKET
 #ifdef WITH_BRIDGE
 					if(db->contexts[i]->bridge){
 						/* Want to try to restart the bridge connection */
@@ -197,7 +198,7 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 									if(db->contexts[i]->current_out_packet){
 										pollfds[pollfd_index].events |= POLLOUT;
 									}
-									db->contexts[i]->pollfd_index = pollfd_index;
+									db->contexts[i]->pollfd_index = pollfd_index;//记录我在本次poll中的下标，方便快速查找
 									pollfd_index++;
 								}else{
 									/* Retry later. */
@@ -208,9 +209,12 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 					}else{
 #endif
 						if(db->contexts[i]->clean_session == true){
+							//这个连接上次由于什么原因，挂了，设置了clean session，所以这里直接彻底清空其结构
 							mqtt3_context_cleanup(db, db->contexts[i], true);
 							db->contexts[i] = NULL;
 						}else if(db->config->persistent_client_expiration > 0){
+							//协议规定persistent_client的状态必须永久保存，这里避免连接永远无法删除，增加这个超时选项。
+							//也就是如果一个客户端断开连接一段时间了，那么我们会主动干掉他
 							/* This is a persistent client, check to see if the
 							 * last time it connected was longer than
 							 * persistent_client_expiration seconds ago. If so,
@@ -233,11 +237,13 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 			}
 		}
 
+		//检测消息超时，设置重发标志等,其实没有必要，TCP不会丢包，乱序的
 		mqtt3_db_message_timeout_check(db, db->config->retry_interval);
 
 #ifndef WIN32
 		sigprocmask(SIG_SETMASK, &sigblock, &origsig);
 		fdcount = poll(pollfds, pollfd_index, 100);
+		//poll返回0代表超时了，没事件。-1代表出错，大于0代表有这么多事件
 		sigprocmask(SIG_SETMASK, &origsig, NULL);
 #else
 		fdcount = WSAPoll(pollfds, pollfd_index, 100);
@@ -340,6 +346,7 @@ static void loop_handle_reads_writes(struct mosquitto_db *db, struct pollfd *pol
 #else
 			if(pollfds[db->contexts[i]->pollfd_index].revents & POLLOUT){
 #endif
+				//连接可写，则尝试发送数据
 				if(_mosquitto_packet_write(db->contexts[i])){
 					if(db->config->connection_messages == true){
 						if(db->contexts[i]->state != mosq_cs_disconnecting){
@@ -362,6 +369,7 @@ static void loop_handle_reads_writes(struct mosquitto_db *db, struct pollfd *pol
 #else
 			if(pollfds[db->contexts[i]->pollfd_index].revents & POLLIN){
 #endif
+				//连接可读，则读取出书病处理之
 				if(_mosquitto_packet_read(db, db->contexts[i])){
 					if(db->config->connection_messages == true){
 						if(db->contexts[i]->state != mosq_cs_disconnecting){
@@ -377,7 +385,7 @@ static void loop_handle_reads_writes(struct mosquitto_db *db, struct pollfd *pol
 		}
 		if(db->contexts[i] && db->contexts[i]->sock != INVALID_SOCKET){
 			if(pollfds[db->contexts[i]->pollfd_index].revents & (POLLHUP | POLLRDHUP | POLLERR | POLLNVAL)){
-				do_disconnect(db, i);
+				do_disconnect(db, i);//连接挂了
 			}
 		}
 	}

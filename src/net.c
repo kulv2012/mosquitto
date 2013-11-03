@@ -306,6 +306,9 @@ int mqtt3_socket_listen(struct _mqtt3_listener *listener)
 	hints.ai_flags = AI_PASSIVE;
 	hints.ai_socktype = SOCK_STREAM;
 
+	//导致下面返回多个链表节的的因素可能有：
+	//hostname参数关联的地址有多个，那么每个返回一个节点；比如host为域名的时候，nslookup返回几个ip就有几个
+	//service参数指定的服务会吃多个套接字接口类型，那么也返回多个
 	if(getaddrinfo(listener->host, service, &hints, &ainfo)) return INVALID_SOCKET;
 
 	listener->sock_count = 0;

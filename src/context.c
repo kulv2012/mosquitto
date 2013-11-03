@@ -177,7 +177,7 @@ void mqtt3_context_cleanup(struct mosquitto_db *db, struct mosquitto *context, b
 }
 
 void mqtt3_context_disconnect(struct mosquitto_db *db, struct mosquitto *ctxt)
-{
+{//断开一个连接，注意不会清楚相关的数据结构，等客户端再次连接上来的时候，这些数据还是能用的。除非clean session了
 	if(ctxt->state != mosq_cs_disconnecting && ctxt->will){
 		/* Unexpected disconnect, queue the client will. */
 		mqtt3_db_messages_easy_queue(db, ctxt, ctxt->will->topic, ctxt->will->qos, ctxt->will->payloadlen, ctxt->will->payload, ctxt->will->retain);
