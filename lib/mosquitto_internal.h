@@ -32,13 +32,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include "config.h"
 
-#ifdef WIN32
-#  include <winsock2.h>
-#endif
 
-#ifdef WITH_TLS
-#include <openssl/ssl.h>
-#endif
 #include <stdlib.h>
 
 #if defined(WITH_THREADING) && !defined(WITH_BROKER)
@@ -47,18 +41,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #  include <dummypthread.h>
 #endif
 
-#ifdef WIN32
-#	if _MSC_VER < 1600
-		typedef unsigned char uint8_t;
-		typedef unsigned short uint16_t;
-		typedef unsigned int uint32_t;
-		typedef unsigned long long uint64_t;
-#	else
-#		include <stdint.h>
-#	endif
-#else
 #	include <stdint.h>
-#endif
 
 #include "mosquitto.h"
 #include "time_mosq.h"
@@ -118,11 +101,7 @@ struct mosquitto_message_all{
 };
 
 struct mosquitto {
-#ifndef WIN32
 	int sock;
-#else
-	SOCKET sock;
-#endif
 	char *address;
 	char *id;
 	char *username;
@@ -138,21 +117,6 @@ struct mosquitto {
 	struct _mosquitto_packet *current_out_packet;//当前正在发送中的数据包，可能只发送了一部分
 	struct _mosquitto_packet *out_packet;//待发送出去的包的链表
 	struct mosquitto_message *will;
-#ifdef WITH_TLS
-	SSL *ssl;
-	SSL_CTX *ssl_ctx;
-	char *tls_cafile;
-	char *tls_capath;
-	char *tls_certfile;
-	char *tls_keyfile;
-	int (*tls_pw_callback)(char *buf, int size, int rwflag, void *userdata);
-	int tls_cert_reqs;
-	char *tls_version;
-	char *tls_ciphers;
-	char *tls_psk;
-	char *tls_psk_identity;
-	bool tls_insecure;
-#endif
 	bool want_read;
 	bool want_write;
 #if defined(WITH_THREADING) && !defined(WITH_BROKER)

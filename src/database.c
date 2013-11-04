@@ -362,15 +362,6 @@ int mqtt3_db_message_insert(struct mosquitto_db *db, struct mosquitto *context, 
 			return MOSQ_ERR_NOMEM;
 		}
 	}
-#ifdef WITH_BRIDGE
-	msg_count++; /* We've just added a message to the list */
-	if(context->bridge && context->bridge->start_type == bst_lazy
-			&& context->sock == INVALID_SOCKET
-			&& msg_count >= context->bridge->threshold){
-
-		context->bridge->lazy_reconnect = true;
-	}
-#endif
 
 	return rc;
 }

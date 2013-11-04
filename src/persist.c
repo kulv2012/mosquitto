@@ -31,9 +31,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #ifdef WITH_PERSISTENCE
 
-#ifndef WIN32
 #include <arpa/inet.h>
-#endif
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>

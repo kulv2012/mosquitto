@@ -31,12 +31,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifndef WIN32
 #include <unistd.h>
-#else
-#include <process.h>
-#define snprintf sprintf_s
-#endif
 
 #include <mosquitto.h>
 

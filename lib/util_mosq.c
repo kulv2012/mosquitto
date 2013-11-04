@@ -30,9 +30,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <assert.h>
 #include <string.h>
 
-#ifdef WIN32
-#include <winsock2.h>
-#endif
 
 
 #include "mosquitto.h"
@@ -92,17 +89,6 @@ void _mosquitto_check_keepalive(struct mosquitto *mosq)
 #endif
 
 	assert(mosq);
-#if defined(WITH_BROKER) && defined(WITH_BRIDGE)
-	/* Check if a lazy bridge should be timed out due to idle. */
-	if(mosq->bridge && mosq->bridge->start_type == bst_lazy
-				&& mosq->sock != INVALID_SOCKET
-				&& now - mosq->last_msg_out >= mosq->bridge->idle_timeout){
-
-		_mosquitto_log_printf(NULL, MOSQ_LOG_NOTICE, "Bridge connection %s has exceeded idle timeout, disconnecting.", mosq->id);
-		_mosquitto_socket_close(mosq);
-		return;
-	}
-#endif
 	pthread_mutex_lock(&mosq->msgtime_mutex);
 	last_msg_out = mosq->last_msg_out;
 	last_msg_in = mosq->last_msg_in;
@@ -321,17 +307,6 @@ int _mosquitto_hex2bin(const char *hex, unsigned char *bin, int bin_max_len)
 
 FILE *_mosquitto_fopen(const char *path, const char *mode)
 {
-#ifdef WIN32
-	char buf[MAX_PATH];
-	int rc;
-	rc = ExpandEnvironmentStrings(path, buf, MAX_PATH);
-	if(rc == 0 || rc == MAX_PATH){
-		return NULL;
-	}else{
-		return fopen(buf, mode);
-	}
-#else
 	return fopen(path, mode);
-#endif
 }
 

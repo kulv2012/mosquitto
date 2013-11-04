@@ -71,14 +71,6 @@ int mqtt3_packet_handle(struct mosquitto_db *db, struct mosquitto *context)
 			return mqtt3_handle_subscribe(db, context);
 		case UNSUBSCRIBE:
 			return mqtt3_handle_unsubscribe(db, context);
-#ifdef WITH_BRIDGE
-		case CONNACK:
-			return mqtt3_handle_connack(db, context);
-		case SUBACK:
-			return _mosquitto_handle_suback(context);
-		case UNSUBACK:
-			return _mosquitto_handle_unsuback(context);
-#endif
 		default:
 			/* If we don't recognise the command, return an error straight away. */
 			return MOSQ_ERR_PROTOCOL;
@@ -98,12 +90,6 @@ int mqtt3_handle_publish(struct mosquitto_db *db, struct mosquitto *context)
 	struct mosquitto_msg_store *stored = NULL;
 	int len;
 	char *topic_mount;
-#ifdef WITH_BRIDGE
-	char *topic_temp;
-	int i;
-	struct _mqtt3_bridge_topic *cur_topic;
-	bool match;
-#endif
 
 	dup = (header & 0x08)>>3;
 	qos = (header & 0x06)>>1;
@@ -123,50 +109,6 @@ int mqtt3_handle_publish(struct mosquitto_db *db, struct mosquitto *context)
 		_mosquitto_free(topic);
 		return 1;
 	}
-#ifdef WITH_BRIDGE
-	if(context->bridge && context->bridge->topics && context->bridge->topic_remapping){
-		for(i=0; i<context->bridge->topic_count; i++){
-			cur_topic = &context->bridge->topics[i];
-			if(cur_topic->remote_prefix || cur_topic->local_prefix){
-				/* Topic mapping required on this topic if the message matches */
-
-				rc = mosquitto_topic_matches_sub(cur_topic->remote_topic, topic, &match);
-				if(rc){
-					_mosquitto_free(topic);
-					return rc;
-				}
-				if(match){
-					if(cur_topic->remote_prefix){
-						/* This prefix needs removing. */
-						if(!strncmp(cur_topic->remote_prefix, topic, strlen(cur_topic->remote_prefix))){
-							topic_temp = _mosquitto_strdup(topic+strlen(cur_topic->remote_prefix));
-							if(!topic_temp){
-								_mosquitto_free(topic);
-								return MOSQ_ERR_NOMEM;
-							}
-							_mosquitto_free(topic);
-							topic = topic_temp;
-						}
-					}
-
-					if(cur_topic->local_prefix){
-						/* This prefix needs adding. */
-						len = strlen(topic) + strlen(cur_topic->local_prefix)+1;
-						topic_temp = _mosquitto_calloc(len+1, sizeof(char));
-						if(!topic_temp){
-							_mosquitto_free(topic);
-							return MOSQ_ERR_NOMEM;
-						}
-						snprintf(topic_temp, len, "%s%s", cur_topic->local_prefix, topic);
-						_mosquitto_free(topic);
-						topic = topic_temp;
-					}
-					break;
-				}
-			}
-		}
-	}
-#endif
 	if(_mosquitto_topic_wildcard_len_check(topic) != MOSQ_ERR_SUCCESS){
 		/* Invalid publish topic, just swallow it. */
 		_mosquitto_free(topic);

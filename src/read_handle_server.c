@@ -60,11 +60,6 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 	int rc;
 	struct _mosquitto_acl_user *acl_tail;
 	int slen;
-#ifdef WITH_TLS
-	X509 *client_cert;
-	X509_NAME *name;
-	X509_NAME_ENTRY *name_entry;
-#endif
 	struct _clientid_index_hash *find_cih;
 	struct _clientid_index_hash *new_cih;
 
@@ -218,58 +213,6 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 		}
 	}
 
-#ifdef WITH_TLS
-	if(context->listener->use_identity_as_username){
-		if(!context->ssl){
-			_mosquitto_send_connack(context, CONNACK_REFUSED_BAD_USERNAME_PASSWORD);
-			mqtt3_context_disconnect(db, context);
-			rc = MOSQ_ERR_SUCCESS;
-			goto handle_connect_error;
-		}
-#ifdef REAL_WITH_TLS_PSK
-		if(context->listener->psk_hint){
-			/* Client should have provided an identity to get this far. */
-			if(!context->username){
-				_mosquitto_send_connack(context, CONNACK_REFUSED_BAD_USERNAME_PASSWORD);
-				mqtt3_context_disconnect(db, context);
-				rc = MOSQ_ERR_SUCCESS;
-				goto handle_connect_error;
-			}
-		}else{
-#endif /* REAL_WITH_TLS_PSK */
-			client_cert = SSL_get_peer_certificate(context->ssl);
-			if(!client_cert){
-				_mosquitto_send_connack(context, CONNACK_REFUSED_BAD_USERNAME_PASSWORD);
-				mqtt3_context_disconnect(db, context);
-				rc = MOSQ_ERR_SUCCESS;
-				goto handle_connect_error;
-			}
-			name = X509_get_subject_name(client_cert);
-			if(!name){
-				_mosquitto_send_connack(context, CONNACK_REFUSED_BAD_USERNAME_PASSWORD);
-				mqtt3_context_disconnect(db, context);
-				rc = MOSQ_ERR_SUCCESS;
-				goto handle_connect_error;
-			}
-
-			i = X509_NAME_get_index_by_NID(name, NID_commonName, -1);
-			if(i == -1){
-				_mosquitto_send_connack(context, CONNACK_REFUSED_BAD_USERNAME_PASSWORD);
-				mqtt3_context_disconnect(db, context);
-				rc = MOSQ_ERR_SUCCESS;
-				goto handle_connect_error;
-			}
-			name_entry = X509_NAME_get_entry(name, i);
-			context->username = _mosquitto_strdup((char *)ASN1_STRING_data(name_entry->value));
-			if(!context->username){
-				rc = MOSQ_ERR_SUCCESS;
-				goto handle_connect_error;
-			}
-#ifdef REAL_WITH_TLS_PSK
-		}
-#endif /* REAL_WITH_TLS_PSK */
-	}else{
-#endif /* WITH_TLS */
 		if(username_flag){
 			rc = mosquitto_unpwd_check(db, username, password);
 			if(rc == MOSQ_ERR_AUTH){
@@ -292,9 +235,6 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 			rc = MOSQ_ERR_SUCCESS;
 			goto handle_connect_error;
 		}
-#ifdef WITH_TLS
-	}
-#endif
 
 	/* Find if this client already has an entry. This must be done *after* any security checks. */
 	HASH_FIND_STR(db->clientid_index_hash, client_id, find_cih);
@@ -320,16 +260,10 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 		db->contexts[i]->last_msg_out = mosquitto_time();
 		db->contexts[i]->keepalive = context->keepalive;
 		db->contexts[i]->pollfd_index = context->pollfd_index;
-#ifdef WITH_TLS
-		db->contexts[i]->ssl = context->ssl;
-#endif
 		if(context->username){
 			db->contexts[i]->username = _mosquitto_strdup(context->username);
 		}
 		context->sock = -1;
-#ifdef WITH_TLS
-		context->ssl = NULL;
-#endif
 		context->state = mosq_cs_disconnecting;
 		context = db->contexts[i];
 		if(context->msgs){

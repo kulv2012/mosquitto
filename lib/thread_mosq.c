@@ -29,9 +29,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include "config.h"
 
-#ifndef WIN32
 #include <unistd.h>
-#endif
 
 #include "mosquitto_internal.h"
 

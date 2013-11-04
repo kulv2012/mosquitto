@@ -41,27 +41,11 @@ This product includes software written by Tim Hudson (tjh@cryptsoft.com)
 extern "C" {
 #endif
 
-#if defined(WIN32) && !defined(WITH_BROKER)
-#	ifdef libmosquitto_EXPORTS
-#		define libmosq_EXPORT  __declspec(dllexport)
-#	else
-#		define libmosq_EXPORT  __declspec(dllimport)
-#	endif
-#else
 #	define libmosq_EXPORT
-#endif
 
-#ifdef WIN32
-#	ifndef __cplusplus
-#		define bool char
-#		define true 1
-#		define false 0
-#	endif
-#else
 #	ifndef __cplusplus
 #		include <stdbool.h>
 #	endif
-#endif
 
 #define LIBMOSQUITTO_MAJOR 1
 #define LIBMOSQUITTO_MINOR 2

@@ -29,15 +29,10 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include <config.h>
 
-#ifndef WIN32
 #include <netdb.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
-#else
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#endif
 
 #include <assert.h>
 #include <errno.h>
@@ -65,12 +60,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <net_mosq.h>
 #include <util_mosq.h>
 
-#ifdef WITH_TLS
-#include "tls_mosq.h"
-#include <openssl/err.h>
-static int tls_ex_index_context = -1;
-static int tls_ex_index_listener = -1;
-#endif
 
 #ifdef WITH_SYS_TREE
 extern unsigned int g_socket_connections;
@@ -84,12 +73,6 @@ int mqtt3_socket_accept(struct mosquitto_db *db, int listensock)
 	struct mosquitto **tmp_contexts = NULL;
 	struct mosquitto *new_context;
 	int opt = 1;
-#ifdef WITH_TLS
-	BIO *bio;
-	int rc;
-	char ebuf[256];
-	unsigned long e;
-#endif
 #ifdef WITH_WRAP
 	struct request_info wrap_req;
 	char address[1024];
@@ -102,7 +85,6 @@ int mqtt3_socket_accept(struct mosquitto_db *db, int listensock)
 	g_socket_connections++;
 #endif
 
-#ifndef WIN32
 	/* Set non-blocking */
 	opt = fcntl(new_sock, F_GETFL, 0);
 	if(opt == -1 || fcntl(new_sock, F_SETFL, opt | O_NONBLOCK) == -1){
@@ -110,12 +92,6 @@ int mqtt3_socket_accept(struct mosquitto_db *db, int listensock)
 		close(new_sock);
 		return -1;
 	}
-#else
-	if(ioctlsocket(new_sock, FIONBIO, &opt)){
-		closesocket(new_sock);
-		return INVALID_SOCKET;
-	}
-#endif
 
 #ifdef WITH_WRAP
 	/* Use tcpd / libwrap to determine whether a connection is allowed. */
@@ -175,48 +151,6 @@ int mqtt3_socket_accept(struct mosquitto_db *db, int listensock)
 		new_context->db_index = i;
 		new_context->listener->client_count++;
 
-#ifdef WITH_TLS
-		/* TLS init */
-		for(i=0; i<db->config->listener_count; i++){
-			for(j=0; j<db->config->listeners[i].sock_count; j++){
-				if(db->config->listeners[i].socks[j] == listensock){
-					if(db->config->listeners[i].ssl_ctx){
-						new_context->ssl = SSL_new(db->config->listeners[i].ssl_ctx);
-						if(!new_context->ssl){
-							COMPAT_CLOSE(new_sock);
-							return -1;
-						}
-						SSL_set_ex_data(new_context->ssl, tls_ex_index_context, new_context);
-						SSL_set_ex_data(new_context->ssl, tls_ex_index_listener, &db->config->listeners[i]);
-						new_context->want_read = true;
-						new_context->want_write = true;
-						bio = BIO_new_socket(new_sock, BIO_NOCLOSE);
-						SSL_set_bio(new_context->ssl, bio, bio);
-						rc = SSL_accept(new_context->ssl);
-						if(rc != 1){
-							rc = SSL_get_error(new_context->ssl, rc);
-							if(rc == SSL_ERROR_WANT_READ){
-								new_context->want_read = true;
-							}else if(rc == SSL_ERROR_WANT_WRITE){
-								new_context->want_write = true;
-							}else{
-								e = ERR_get_error();
-								while(e){
-									_mosquitto_log_printf(NULL, MOSQ_LOG_NOTICE,
-											"Client connection from %s failed: %s.",
-											new_context->address, ERR_error_string(e, ebuf));
-									e = ERR_get_error();
-								}
-								COMPAT_CLOSE(new_sock);
-								SSL_free(new_context->ssl);
-								new_context->ssl = NULL;
-							}
-						}
-					}
-				}
-			}
-		}
-#endif
 
 #ifdef WITH_WRAP
 	}
@@ -224,13 +158,6 @@ int mqtt3_socket_accept(struct mosquitto_db *db, int listensock)
 	return new_sock;
 }
 
-#ifdef WITH_TLS
-static int client_certificate_verify(int preverify_ok, X509_STORE_CTX *ctx)
-{
-	/* Preverify should check expiry, revocation. */
-	return preverify_ok;
-}
-#endif
 
 #ifdef REAL_WITH_TLS_PSK
 static unsigned int psk_server_callback(SSL *ssl, const char *identity, unsigned char *psk, unsigned int max_psk_len)
@@ -286,16 +213,7 @@ int mqtt3_socket_listen(struct _mqtt3_listener *listener)
 	struct addrinfo *ainfo, *rp;
 	char service[10];
 	int opt = 1;
-#ifndef WIN32
 	int ss_opt = 1;
-#else
-	char ss_opt = 1;
-#endif
-#ifdef WITH_TLS
-	int rc;
-	X509_STORE *store;
-	X509_LOOKUP *lookup;
-#endif
 	char err[256];
 
 	if(!listener) return MOSQ_ERR_INVAL;
@@ -337,15 +255,12 @@ int mqtt3_socket_listen(struct _mqtt3_listener *listener)
 		}
 		listener->socks[listener->sock_count-1] = sock;
 
-#ifndef WIN32
 		ss_opt = 1;
 		setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &ss_opt, sizeof(ss_opt));
-#endif
 		ss_opt = 1;
 		setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, &ss_opt, sizeof(ss_opt));
 
 
-#ifndef WIN32
 		/* Set non-blocking */
 		opt = fcntl(sock, F_GETFL, 0);
 		if(opt == -1 || fcntl(sock, F_SETFL, opt | O_NONBLOCK) == -1){
@@ -353,12 +268,6 @@ int mqtt3_socket_listen(struct _mqtt3_listener *listener)
 			COMPAT_CLOSE(sock);
 			return 1;
 		}
-#else
-		if(ioctlsocket(sock, FIONBIO, &opt)){
-			COMPAT_CLOSE(sock);
-			return 1;
-		}
-#endif
 
 		if(bind(sock, rp->ai_addr, rp->ai_addrlen) == -1){
 			strerror_r(errno, err, 256);
@@ -378,143 +287,6 @@ int mqtt3_socket_listen(struct _mqtt3_listener *listener)
 
 	/* We need to have at least one working socket. */
 	if(listener->sock_count > 0){
-#ifdef WITH_TLS
-		if((listener->cafile || listener->capath) && listener->certfile && listener->keyfile){
-#if OPENSSL_VERSION_NUMBER >= 0x10001000L
-			if(listener->tls_version == NULL){
-				listener->ssl_ctx = SSL_CTX_new(TLSv1_2_server_method());
-			}else if(!strcmp(listener->tls_version, "tlsv1.2")){
-				listener->ssl_ctx = SSL_CTX_new(TLSv1_2_server_method());
-			}else if(!strcmp(listener->tls_version, "tlsv1.1")){
-				listener->ssl_ctx = SSL_CTX_new(TLSv1_1_server_method());
-			}else if(!strcmp(listener->tls_version, "tlsv1")){
-				listener->ssl_ctx = SSL_CTX_new(TLSv1_server_method());
-			}
-#else
-			listener->ssl_ctx = SSL_CTX_new(TLSv1_server_method());
-#endif
-			if(!listener->ssl_ctx){
-				_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Unable to create TLS context.");
-				COMPAT_CLOSE(sock);
-				return 1;
-			}
-#if OPENSSL_VERSION_NUMBER >= 0x10000000
-			/* Disable compression */
-			SSL_CTX_set_options(listener->ssl_ctx, SSL_OP_NO_COMPRESSION);
-#endif
-#ifdef SSL_MODE_RELEASE_BUFFERS
-			/* Use even less memory per SSL connection. */
-			SSL_CTX_set_mode(listener->ssl_ctx, SSL_MODE_RELEASE_BUFFERS);
-#endif
-			if(listener->ciphers){
-				rc = SSL_CTX_set_cipher_list(listener->ssl_ctx, listener->ciphers);
-				if(rc == 0){
-					_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Unable to set TLS ciphers. Check cipher list \"%s\".", listener->ciphers);
-					COMPAT_CLOSE(sock);
-					return 1;
-				}
-			}
-			rc = SSL_CTX_load_verify_locations(listener->ssl_ctx, listener->cafile, listener->capath);
-			if(rc == 0){
-				if(listener->cafile && listener->capath){
-					_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Unable to load CA certificates. Check cafile \"%s\" and capath \"%s\".", listener->cafile, listener->capath);
-				}else if(listener->cafile){
-					_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Unable to load CA certificates. Check cafile \"%s\".", listener->cafile);
-				}else{
-					_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Unable to load CA certificates. Check capath \"%s\".", listener->capath);
-				}
-				COMPAT_CLOSE(sock);
-				return 1;
-			}
-			/* FIXME user data? */
-			if(listener->require_certificate){
-				SSL_CTX_set_verify(listener->ssl_ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, client_certificate_verify);
-			}else{
-				SSL_CTX_set_verify(listener->ssl_ctx, SSL_VERIFY_PEER, client_certificate_verify);
-			}
-			rc = SSL_CTX_use_certificate_chain_file(listener->ssl_ctx, listener->certfile);
-			if(rc != 1){
-				_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Unable to load server certificate \"%s\". Check certfile.", listener->certfile);
-				COMPAT_CLOSE(sock);
-				return 1;
-			}
-			rc = SSL_CTX_use_PrivateKey_file(listener->ssl_ctx, listener->keyfile, SSL_FILETYPE_PEM);
-			if(rc != 1){
-				_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Unable to load server key file \"%s\". Check keyfile.", listener->keyfile);
-				COMPAT_CLOSE(sock);
-				return 1;
-			}
-			rc = SSL_CTX_check_private_key(listener->ssl_ctx);
-			if(rc != 1){
-				_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Server certificate/key are inconsistent.");
-				COMPAT_CLOSE(sock);
-				return 1;
-			}
-			/* Load CRLs if they exist. */
-			if(listener->crlfile){
-				store = SSL_CTX_get_cert_store(listener->ssl_ctx);
-				if(!store){
-					_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Unable to obtain TLS store.");
-					COMPAT_CLOSE(sock);
-					return 1;
-				}
-				lookup = X509_STORE_add_lookup(store, X509_LOOKUP_file());
-				rc = X509_load_crl_file(lookup, listener->crlfile, X509_FILETYPE_PEM);
-				if(rc != 1){
-					_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Unable to load certificate revocation file \"%s\". Check crlfile.", listener->crlfile);
-					COMPAT_CLOSE(sock);
-					return 1;
-				}
-				X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK);
-			}
-
-#  ifdef REAL_WITH_TLS_PSK
-		}else if(listener->psk_hint){
-			if(tls_ex_index_context == -1){
-				tls_ex_index_context = SSL_get_ex_new_index(0, "client context", NULL, NULL, NULL);
-			}
-			if(tls_ex_index_listener == -1){
-				tls_ex_index_listener = SSL_get_ex_new_index(0, "listener", NULL, NULL, NULL);
-			}
-
-#if OPENSSL_VERSION_NUMBER >= 0x10001000L
-			if(listener->tls_version == NULL){
-				listener->ssl_ctx = SSL_CTX_new(TLSv1_2_server_method());
-			}else if(!strcmp(listener->tls_version, "tlsv1.2")){
-				listener->ssl_ctx = SSL_CTX_new(TLSv1_2_server_method());
-			}else if(!strcmp(listener->tls_version, "tlsv1.1")){
-				listener->ssl_ctx = SSL_CTX_new(TLSv1_1_server_method());
-			}else if(!strcmp(listener->tls_version, "tlsv1")){
-				listener->ssl_ctx = SSL_CTX_new(TLSv1_server_method());
-			}
-#else
-			listener->ssl_ctx = SSL_CTX_new(TLSv1_server_method());
-#endif
-			if(!listener->ssl_ctx){
-				_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Unable to create TLS context.");
-				COMPAT_CLOSE(sock);
-				return 1;
-			}
-			SSL_CTX_set_psk_server_callback(listener->ssl_ctx, psk_server_callback);
-			if(listener->psk_hint){
-				rc = SSL_CTX_use_psk_identity_hint(listener->ssl_ctx, listener->psk_hint);
-				if(rc == 0){
-					_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Unable to set TLS PSK hint.");
-					COMPAT_CLOSE(sock);
-					return 1;
-				}
-			}
-			if(listener->ciphers){
-				rc = SSL_CTX_set_cipher_list(listener->ssl_ctx, listener->ciphers);
-				if(rc == 0){
-					_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Unable to set TLS ciphers. Check cipher list \"%s\".", listener->ciphers);
-					COMPAT_CLOSE(sock);
-					return 1;
-				}
-			}
-#  endif /* REAL_WITH_TLS_PSK */
-		}
-#endif /* WITH_TLS */
 		return 0;
 	}else{
 		return 1;

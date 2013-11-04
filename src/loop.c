@@ -32,13 +32,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <config.h>
 
 #include <assert.h>
-#ifndef WIN32
 #include <poll.h>
-#else
-#include <process.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#endif
 
 #include <errno.h>
 #include <signal.h>
@@ -76,22 +70,14 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 	time_t now;
 	int time_count;
 	int fdcount;
-#ifndef WIN32
 	sigset_t sigblock, origsig;
-#endif
 	int i;
 	struct pollfd *pollfds = NULL;
 	int pollfd_count = 0;
 	int pollfd_index;
-#ifdef WITH_BRIDGE
-	int bridge_sock;
-	int rc;
-#endif
 
-#ifndef WIN32
 	sigemptyset(&sigblock);
 	sigaddset(&sigblock, SIGINT);
-#endif
 
 	while(run){
 #ifdef WITH_SYS_TREE
@@ -129,22 +115,6 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 				db->contexts[i]->pollfd_index = -1;
 
 				if(db->contexts[i]->sock != INVALID_SOCKET){
-#ifdef WITH_BRIDGE
-					if(db->contexts[i]->bridge){
-						_mosquitto_check_keepalive(db->contexts[i]);
-						if(db->contexts[i]->bridge->round_robin == false
-								&& db->contexts[i]->bridge->cur_address != 0
-								&& now > db->contexts[i]->bridge->primary_retry){
-
-							/* FIXME - this should be non-blocking */
-							if(_mosquitto_try_connect(db->contexts[i]->bridge->addresses[0].address, db->contexts[i]->bridge->addresses[0].port, &bridge_sock, NULL, true) == MOSQ_ERR_SUCCESS){
-								COMPAT_CLOSE(bridge_sock);
-								_mosquitto_socket_close(db->contexts[i]);
-								db->contexts[i]->bridge->cur_address = db->contexts[i]->bridge->address_count-1;
-							}
-						}
-					}
-#endif
 
 					/* Local bridges never time out in this fashion. */
 					if(!(db->contexts[i]->keepalive) 
@@ -172,42 +142,6 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 						mqtt3_context_disconnect(db, db->contexts[i]);//关闭连接，清空数据，后续还可以用.sock=INVALID_SOCKET 
 					}
 				}else{//db->contexts[i]->sock == INVALID_SOCKET
-#ifdef WITH_BRIDGE
-					if(db->contexts[i]->bridge){
-						/* Want to try to restart the bridge connection */
-						if(!db->contexts[i]->bridge->restart_t){
-							db->contexts[i]->bridge->restart_t = now+db->contexts[i]->bridge->restart_timeout;
-							db->contexts[i]->bridge->cur_address++;
-							if(db->contexts[i]->bridge->cur_address == db->contexts[i]->bridge->address_count){
-								db->contexts[i]->bridge->cur_address = 0;
-							}
-							if(db->contexts[i]->bridge->round_robin == false && db->contexts[i]->bridge->cur_address != 0){
-								db->contexts[i]->bridge->primary_retry = now + 5;
-							}
-						}else{
-							if(db->contexts[i]->bridge->start_type == bst_lazy && db->contexts[i]->bridge->lazy_reconnect){
-								mqtt3_bridge_connect(db, db->contexts[i]);
-							}
-							if(db->contexts[i]->bridge->start_type == bst_automatic && now > db->contexts[i]->bridge->restart_t){
-								db->contexts[i]->bridge->restart_t = 0;
-								rc = mqtt3_bridge_connect(db, db->contexts[i]);
-								if(rc == MOSQ_ERR_SUCCESS){
-									pollfds[pollfd_index].fd = db->contexts[i]->sock;
-									pollfds[pollfd_index].events = POLLIN | POLLRDHUP;
-									pollfds[pollfd_index].revents = 0;
-									if(db->contexts[i]->current_out_packet){
-										pollfds[pollfd_index].events |= POLLOUT;
-									}
-									db->contexts[i]->pollfd_index = pollfd_index;//记录我在本次poll中的下标，方便快速查找
-									pollfd_index++;
-								}else{
-									/* Retry later. */
-									db->contexts[i]->bridge->restart_t = now+db->contexts[i]->bridge->restart_timeout;
-								}
-							}
-						}
-					}else{
-#endif
 						if(db->contexts[i]->clean_session == true){
 							//这个连接上次由于什么原因，挂了，设置了clean session，所以这里直接彻底清空其结构
 							mqtt3_context_cleanup(db, db->contexts[i], true);
@@ -230,9 +164,6 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 								db->contexts[i] = NULL;
 							}
 						}
-#ifdef WITH_BRIDGE
-					}
-#endif
 				}
 			}
 		}
@@ -240,14 +171,10 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 		//检测消息超时，设置重发标志等,其实没有必要，TCP不会丢包，乱序的
 		mqtt3_db_message_timeout_check(db, db->config->retry_interval);
 
-#ifndef WIN32
 		sigprocmask(SIG_SETMASK, &sigblock, &origsig);
 		fdcount = poll(pollfds, pollfd_index, 100);
 		//poll返回0代表超时了，没事件。-1代表出错，大于0代表有这么多事件
 		sigprocmask(SIG_SETMASK, &origsig, NULL);
-#else
-		fdcount = WSAPoll(pollfds, pollfd_index, 100);
-#endif
 		if(fdcount == -1){
 			loop_handle_errors(db, pollfds);
 		}else{
@@ -339,13 +266,7 @@ static void loop_handle_reads_writes(struct mosquitto_db *db, struct pollfd *pol
 	for(i=0; i<db->context_count; i++){
 		if(db->contexts[i] && db->contexts[i]->sock != INVALID_SOCKET){
 			assert(pollfds[db->contexts[i]->pollfd_index].fd == db->contexts[i]->sock);
-#ifdef WITH_TLS
-			if(pollfds[db->contexts[i]->pollfd_index].revents & POLLOUT ||
-					db->contexts[i]->want_write ||
-					(db->contexts[i]->ssl && db->contexts[i]->state == mosq_cs_new)){
-#else
 			if(pollfds[db->contexts[i]->pollfd_index].revents & POLLOUT){
-#endif
 				//连接可写，则尝试发送数据
 				if(_mosquitto_packet_write(db->contexts[i])){
 					if(db->config->connection_messages == true){
@@ -362,13 +283,7 @@ static void loop_handle_reads_writes(struct mosquitto_db *db, struct pollfd *pol
 		}
 		if(db->contexts[i] && db->contexts[i]->sock != INVALID_SOCKET){
 			assert(pollfds[db->contexts[i]->pollfd_index].fd == db->contexts[i]->sock);
-#ifdef WITH_TLS
-			if(pollfds[db->contexts[i]->pollfd_index].revents & POLLIN ||
-					db->contexts[i]->want_read ||
-					(db->contexts[i]->ssl && db->contexts[i]->state == mosq_cs_new)){
-#else
 			if(pollfds[db->contexts[i]->pollfd_index].revents & POLLIN){
-#endif
 				//连接可读，则读取出书病处理之
 				if(_mosquitto_packet_read(db, db->contexts[i])){
 					if(db->config->connection_messages == true){
