@@ -71,9 +71,6 @@ send_mosq.o : ../lib/send_mosq.c ../lib/send_mosq.h
 send_server.o : send_server.c mosquitto_broker.h
 	${CC} $(BROKER_CFLAGS) -c $< -o $@
 
-service.o : service.c mosquitto_broker.h
-	${CC} $(BROKER_CFLAGS) -c $< -o $@
-
 subs.o : subs.c mosquitto_broker.h
 	${CC} $(BROKER_CFLAGS) -c $< -o $@
 
