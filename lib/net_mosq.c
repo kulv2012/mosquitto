@@ -81,16 +81,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "util_mosq.h"
 
 
-void _mosquitto_net_init(void)
-{
-
-}
-
-void _mosquitto_net_cleanup(void)
-{
-
-}
-
 void _mosquitto_packet_cleanup(struct _mosquitto_packet *packet)
 {
 	if(!packet) return;

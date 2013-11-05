@@ -73,15 +73,11 @@ int mosquitto_lib_init(void)
 	gettimeofday(&tv, NULL);
 	srand(tv.tv_sec*1000 + tv.tv_usec/1000);
 
-	_mosquitto_net_init();
-
 	return MOSQ_ERR_SUCCESS;
 }
 
 int mosquitto_lib_cleanup(void)
 {
-	_mosquitto_net_cleanup();
-
 	return MOSQ_ERR_SUCCESS;
 }
 

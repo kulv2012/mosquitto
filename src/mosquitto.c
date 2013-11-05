@@ -149,8 +149,6 @@ int main(int argc, char *argv[])
 
 	memset(&int_db, 0, sizeof(struct mosquitto_db));
 
-	_mosquitto_net_init();
-
 	mqtt3_config_init(&config);
 	rc = mqtt3_config_parse_args(&config, argc, argv);//k: init && load config file, set struct members
 	if(rc != MOSQ_ERR_SUCCESS) return rc;
@@ -291,7 +289,6 @@ int main(int argc, char *argv[])
 		remove(config.pid_file);
 	}
 
-	_mosquitto_net_cleanup();
 	mqtt3_config_cleanup(int_db.config);
 
 	return rc;

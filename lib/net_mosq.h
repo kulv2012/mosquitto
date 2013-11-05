@@ -52,9 +52,6 @@ struct mosquitto_db;
 #define MOSQ_MSB(A) (uint8_t)((A & 0xFF00) >> 8)
 #define MOSQ_LSB(A) (uint8_t)(A & 0x00FF)
 
-void _mosquitto_net_init(void);
-void _mosquitto_net_cleanup(void);
-
 void _mosquitto_packet_cleanup(struct _mosquitto_packet *packet);
 int _mosquitto_packet_queue(struct mosquitto *mosq, struct _mosquitto_packet *packet);
 int _mosquitto_socket_connect(struct mosquitto *mosq, const char *host, uint16_t port, const char *bind_address, bool blocking);
