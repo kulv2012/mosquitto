@@ -40,9 +40,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
-#ifdef WITH_WRAP
-#include <tcpd.h>
-#endif
 
 #include <mosquitto_broker.h>
 #include <memory_mosq.h>
@@ -56,11 +53,6 @@ bool flag_db_backup = false;
 #endif
 bool flag_tree_print = false;
 int run;
-#ifdef WITH_WRAP
-#include <syslog.h>
-int allow_severity = LOG_INFO;
-int deny_severity = LOG_INFO;
-#endif
 
 int drop_privileges(struct mqtt3_config *config);
 void handle_sigint(int signal);

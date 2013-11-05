@@ -577,32 +577,7 @@ int mosquitto_tls_insecure_set(struct mosquitto *mosq, bool value)
 
 int mosquitto_tls_psk_set(struct mosquitto *mosq, const char *psk, const char *identity, const char *ciphers)
 {
-#ifdef REAL_WITH_TLS_PSK
-	if(!mosq || !psk || !identity) return MOSQ_ERR_INVAL;
-
-	/* Check for hex only digits */
-	if(strspn(psk, "0123456789abcdefABCDEF") < strlen(psk)){
-		return MOSQ_ERR_INVAL;
-	}
-	mosq->tls_psk = _mosquitto_strdup(psk);
-	if(!mosq->tls_psk) return MOSQ_ERR_NOMEM;
-
-	mosq->tls_psk_identity = _mosquitto_strdup(identity);
-	if(!mosq->tls_psk_identity){
-		_mosquitto_free(mosq->tls_psk);
-		return MOSQ_ERR_NOMEM;
-	}
-	if(ciphers){
-		mosq->tls_ciphers = _mosquitto_strdup(ciphers);
-		if(!mosq->tls_ciphers) return MOSQ_ERR_NOMEM;
-	}else{
-		mosq->tls_ciphers = NULL;
-	}
-
-	return MOSQ_ERR_SUCCESS;
-#else
 	return MOSQ_ERR_NOT_SUPPORTED;
-#endif
 }
 
 

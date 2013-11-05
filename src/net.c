@@ -39,9 +39,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
-#ifdef WITH_WRAP
-#include <tcpd.h>
-#endif
 
 #ifdef __FreeBSD__
 #  include <netinet/in.h>
@@ -73,10 +70,6 @@ int mqtt3_socket_accept(struct mosquitto_db *db, int listensock)
 	struct mosquitto **tmp_contexts = NULL;
 	struct mosquitto *new_context;
 	int opt = 1;
-#ifdef WITH_WRAP
-	struct request_info wrap_req;
-	char address[1024];
-#endif
 
 	new_sock = accept(listensock, NULL, 0);
 	if(new_sock == INVALID_SOCKET) return -1;
@@ -93,19 +86,6 @@ int mqtt3_socket_accept(struct mosquitto_db *db, int listensock)
 		return -1;
 	}
 
-#ifdef WITH_WRAP
-	/* Use tcpd / libwrap to determine whether a connection is allowed. */
-	request_init(&wrap_req, RQ_FILE, new_sock, RQ_DAEMON, "mosquitto", 0);
-	fromhost(&wrap_req);
-	if(!hosts_access(&wrap_req)){
-		/* Access is denied */
-		if(!_mosquitto_socket_get_address(new_sock, address, 1024)){
-			_mosquitto_log_printf(NULL, MOSQ_LOG_NOTICE, "Client connection from %s denied access by tcpd.", address);
-		}
-		COMPAT_CLOSE(new_sock);
-		return -1;
-	}else{
-#endif
 		new_context = mqtt3_context_init(new_sock);
 		if(!new_context){
 			COMPAT_CLOSE(new_sock);
@@ -152,55 +132,10 @@ int mqtt3_socket_accept(struct mosquitto_db *db, int listensock)
 		new_context->listener->client_count++;
 
 
-#ifdef WITH_WRAP
-	}
-#endif
 	return new_sock;
 }
 
 
-#ifdef REAL_WITH_TLS_PSK
-static unsigned int psk_server_callback(SSL *ssl, const char *identity, unsigned char *psk, unsigned int max_psk_len)
-{
-	struct mosquitto_db *db;
-	struct mosquitto *context;
-	struct _mqtt3_listener *listener;
-	char *psk_key = NULL;
-	int len;
-	const char *psk_hint;
-
-	if(!identity) return 0;
-
-	db = _mosquitto_get_db();
-
-	context = SSL_get_ex_data(ssl, tls_ex_index_context);
-	if(!context) return 0;
-
-	listener = SSL_get_ex_data(ssl, tls_ex_index_listener);
-	if(!listener) return 0;
-
-	psk_hint = listener->psk_hint;
-
-	/* The hex to BN conversion results in the length halving, so we can pass
-	 * max_psk_len*2 as the max hex key here. */
-	psk_key = _mosquitto_calloc(1, max_psk_len*2 + 1);
-	if(!psk_key) return 0;
-
-	if(mosquitto_psk_key_get(db, psk_hint, identity, psk_key, max_psk_len*2) != MOSQ_ERR_SUCCESS){
-		return 0;
-	}
-
-	len = _mosquitto_hex2bin(psk_key, psk, max_psk_len);
-	if (len < 0) return 0;
-
-	if(listener->use_identity_as_username){
-		context->username = _mosquitto_strdup(identity);
-		if(!context->username) return 0;
-	}
-
-	return len;
-}
-#endif
 
 /* Creates a socket and listens on port 'port'.
  * Returns 1 on failure

@@ -153,24 +153,6 @@ int _mosquitto_socket_close(struct mosquitto *mosq)
 	return rc;
 }
 
-#ifdef REAL_WITH_TLS_PSK
-static unsigned int psk_client_callback(SSL *ssl, const char *hint,
-		char *identity, unsigned int max_identity_len,
-		unsigned char *psk, unsigned int max_psk_len)
-{
-	struct mosquitto *mosq;
-	int len;
-
-	mosq = SSL_get_ex_data(ssl, tls_ex_index_mosq);
-	if(!mosq) return 0;
-
-	snprintf(identity, max_identity_len, "%s", mosq->tls_psk_identity);
-
-	len = _mosquitto_hex2bin(mosq->tls_psk, psk, max_psk_len);
-	if (len < 0) return 0;
-	return len;
-}
-#endif
 
 int _mosquitto_try_connect(const char *host, uint16_t port, int *sock, const char *bind_address, bool blocking)
 {

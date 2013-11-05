@@ -771,24 +771,9 @@ int _config_read_file(struct mqtt3_config *config, bool reload, const char *file
 					}
 					config->default_listener.port = port_tmp;
 				}else if(!strcmp(token, "psk_file")){
-#ifdef REAL_WITH_TLS_PSK
-					if(reload){
-						if(config->psk_file){
-							_mosquitto_free(config->psk_file);
-							config->psk_file = NULL;
-						}
-					}
-					if(_conf_parse_string(&token, "psk_file", &config->psk_file, saveptr)) return MOSQ_ERR_INVAL;
-#else
 					_mosquitto_log_printf(NULL, MOSQ_LOG_WARNING, "Warning: TLS/TLS-PSK support not available.");
-#endif
 				}else if(!strcmp(token, "psk_hint")){
-#ifdef REAL_WITH_TLS_PSK
-					if(reload) continue; // Listeners not valid for reloading.
-					if(_conf_parse_string(&token, "psk_hint", &cur_listener->psk_hint, saveptr)) return MOSQ_ERR_INVAL;
-#else
 					_mosquitto_log_printf(NULL, MOSQ_LOG_WARNING, "Warning: TLS/TLS-PSK support not available.");
-#endif
 				}else if(!strcmp(token, "queue_qos0_messages")){
 					if(_conf_parse_bool(&token, token, &config->queue_qos0_messages, saveptr)) return MOSQ_ERR_INVAL;
 				}else if(!strcmp(token, "require_certificate")){

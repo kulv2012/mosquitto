@@ -41,8 +41,5 @@ uint16_t _mosquitto_mid_generate(struct mosquitto *mosq);
 int _mosquitto_topic_wildcard_len_check(const char *str);
 FILE *_mosquitto_fopen(const char *path, const char *mode);
 
-#ifdef REAL_WITH_TLS_PSK
-int _mosquitto_hex2bin(const char *hex, unsigned char *bin, int bin_max_len);
-#endif
 
 #endif
