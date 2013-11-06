@@ -86,50 +86,53 @@ int mqtt3_socket_accept(struct mosquitto_db *db, int listensock)
 		return -1;
 	}
 
-		new_context = mqtt3_context_init(new_sock);
-		if(!new_context){
-			COMPAT_CLOSE(new_sock);
-			return -1;
-		}
-		for(i=0; i<db->config->listener_count; i++){
-			for(j=0; j<db->config->listeners[i].sock_count; j++){
-				if(db->config->listeners[i].socks[j] == listensock){
-					new_context->listener = &db->config->listeners[i];
-					break;
-				}
-			}
-		}
-		if(!new_context->listener){
-			COMPAT_CLOSE(new_sock);
-			return -1;
-		}
-
-		if(new_context->listener->max_connections > 0 && new_context->listener->client_count >= new_context->listener->max_connections){
-			_mosquitto_log_printf(NULL, MOSQ_LOG_NOTICE, "Client connection from %s denied: max_connections exceeded.", new_context->address);
-			COMPAT_CLOSE(new_sock);
-			return -1;
-		}
-		_mosquitto_log_printf(NULL, MOSQ_LOG_NOTICE, "New connection from %s on port %d.", new_context->address, new_context->listener->port);
-		for(i=0; i<db->context_count; i++){
-			if(db->contexts[i] == NULL){
-				db->contexts[i] = new_context;
+	//初始化个跟客户端连接的context，里面会设置客户端的IP地址，这里可以考虑不在里面做，accept的时候参数中完成即可
+	new_context = mqtt3_context_init(new_sock);
+	if(!new_context){
+		COMPAT_CLOSE(new_sock);
+		return -1;
+	}
+	for(i=0; i<db->config->listener_count; i++){//循环找每一个listeners，找到我是属于哪个listeners.实际上epoll后就不需要这些东西了
+		for(j=0; j<db->config->listeners[i].sock_count; j++){
+			if(db->config->listeners[i].socks[j] == listensock){
+				new_context->listener = &db->config->listeners[i];//指向我所属的listener
 				break;
 			}
 		}
-		if(i==db->context_count){
-			tmp_contexts = _mosquitto_realloc(db->contexts, sizeof(struct mosquitto*)*(db->context_count+1));
-			if(tmp_contexts){
-				db->context_count++;
-				db->contexts = tmp_contexts;
-				db->contexts[i] = new_context;
-			}else{
-				// Out of memory
-				mqtt3_context_cleanup(NULL, new_context, true);
-			}
+	}
+	if(!new_context->listener){
+		COMPAT_CLOSE(new_sock);
+		return -1;
+	}
+
+	if(new_context->listener->max_connections > 0 && new_context->listener->client_count >= new_context->listener->max_connections){
+		_mosquitto_log_printf(NULL, MOSQ_LOG_NOTICE, "Client connection from %s denied: max_connections exceeded.", new_context->address);
+		COMPAT_CLOSE(new_sock);
+		return -1;
+	}
+	_mosquitto_log_printf(NULL, MOSQ_LOG_NOTICE, "New connection from %s on port %d.", new_context->address, new_context->listener->port);
+	for(i=0; i<db->context_count; i++){//找一个空的contexts结构，指向这一个空连接
+		if(db->contexts[i] == NULL){
+			db->contexts[i] = new_context;
+			break;
 		}
-		// If we got here then the context's DB index is "i" regardless of how we got here
-		new_context->db_index = i;
-		new_context->listener->client_count++;
+	}
+	if(i==db->context_count){//没有了，重新realloc一个，这个代价很大的。所以建议申请2倍，保留一些空余的,到一定程度的时候每次增加32个也行
+		tmp_contexts = _mosquitto_realloc(db->contexts, sizeof(struct mosquitto*)*(db->context_count+1));
+		if(tmp_contexts){
+			db->context_count++;
+			db->contexts = tmp_contexts;//这样的话，所有人都不能用指向contexts数组某个位置的指针来标识这个连接，比如放到epoll里面去世不行的
+			db->contexts[i] = new_context;
+		}else{
+			//到这里，说明contexts[]数组不够了，而且relloac也失败，怎么办，只能丢掉这个连接了。但是下面并没有return -1,而且还去访问了。是个bug
+			// Out of memory
+			mqtt3_context_cleanup(NULL, new_context, true);
+			return -1 ;//必须return,否则下面会core
+		}
+	}
+	// If we got here then the context's DB index is "i" regardless of how we got here
+	new_context->db_index = i;
+	new_context->listener->client_count++;
 
 
 	return new_sock;
@@ -234,6 +237,7 @@ int _mosquitto_socket_get_address(int sock, char *buf, int len)
 	socklen_t addrlen;
 
 	addrlen = sizeof(addr);
+	//获取客户端IP地址,这个明显在accept的时候获取合适嘛
 	if(!getpeername(sock, (struct sockaddr *)&addr, &addrlen)){
 		if(addr.ss_family == AF_INET){
 			if(inet_ntop(AF_INET, &((struct sockaddr_in *)&addr)->sin_addr.s_addr, buf, len)){

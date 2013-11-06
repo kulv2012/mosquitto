@@ -65,7 +65,7 @@ static void loop_handle_reads_writes(struct mosquitto_db *db, struct pollfd *pol
 int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock_count, int listener_max)
 {
 	time_t start_time = mosquitto_time();
-	time_t last_backup = mosquitto_time();
+	time_t last_backup = mosquitto_time();//上次数据库备份的时间点,autosave_on_changes没设置的时候采用间隔多久备份
 	time_t last_store_clean = mosquitto_time();
 	time_t now;
 	int time_count;
@@ -117,19 +117,19 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 				if(db->contexts[i]->sock != INVALID_SOCKET){
 
 					/* Local bridges never time out in this fashion. */
-					if(!(db->contexts[i]->keepalive) 
-							|| db->contexts[i]->bridge
-							|| now - db->contexts[i]->last_msg_in < (time_t)(db->contexts[i]->keepalive)*3/2){
+					if(!(db->contexts[i]->keepalive) //不需要keepalive
+							|| db->contexts[i]->bridge   //或者是bridge
+							|| now - db->contexts[i]->last_msg_in < (time_t)(db->contexts[i]->keepalive)*3/2){//或者没有超时，那么需要进行监听
 
 						//在进入poll等待之前，先尝试将未发送的数据发送出去
 						if(mqtt3_db_message_write(db->contexts[i]) == MOSQ_ERR_SUCCESS){
 							pollfds[pollfd_index].fd = db->contexts[i]->sock;
 							pollfds[pollfd_index].events = POLLIN | POLLRDHUP;
 							pollfds[pollfd_index].revents = 0;
-							if(db->contexts[i]->current_out_packet){
+							if(db->contexts[i]->current_out_packet){//如果当前有需要发送的数据，才监听可写事件
 								pollfds[pollfd_index].events |= POLLOUT;
 							}
-							db->contexts[i]->pollfd_index = pollfd_index;
+							db->contexts[i]->pollfd_index = pollfd_index;//记录我这个fd在本次pollfds中的下标，待会会扫描所有fd
 							pollfd_index++;
 						}else{//尝试发送失败，连接出问题了
 							mqtt3_context_disconnect(db, db->contexts[i]);
@@ -159,7 +159,7 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 #ifdef WITH_SYS_TREE
 								g_clients_expired++;
 #endif
-								db->contexts[i]->clean_session = true;
+								db->contexts[i]->clean_session = true;//标记强制清空session
 								mqtt3_context_cleanup(db, db->contexts[i], true);
 								db->contexts[i] = NULL;
 							}
@@ -182,6 +182,7 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 
 			for(i=0; i<listensock_count; i++){
 				if(pollfds[i].revents & (POLLIN | POLLPRI)){
+					//listen sock可读的时候可能有多个新连接，需要循环accept
 					while(mqtt3_socket_accept(db, listensock[i]) != -1){
 					}
 				}
@@ -189,12 +190,12 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 		}
 #ifdef WITH_PERSISTENCE
 		if(db->config->persistence && db->config->autosave_interval){
-			if(db->config->autosave_on_changes){
+			if(db->config->autosave_on_changes){//设置了，则用累积了多少条改动后持久化
 				if(db->persistence_changes > db->config->autosave_interval){
 					mqtt3_db_backup(db, false, false);
 					db->persistence_changes = 0;
 				}
-			}else{
+			}else{//否则按间隔时间来持久化
 				if(last_backup + db->config->autosave_interval < mosquitto_time()){
 					mqtt3_db_backup(db, false, false);
 					last_backup = mosquitto_time();
@@ -202,6 +203,7 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 			}
 		}
 #endif
+		//store_clean_interval为Time in seconds between cleaning the internal message store of unreferenced messages.
 		if(!db->config->store_clean_interval || last_store_clean + db->config->store_clean_interval < mosquitto_time()){
 			mqtt3_db_store_clean(db);
 			last_store_clean = mosquitto_time();
@@ -221,7 +223,7 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 			mqtt3_log_init(db->config->log_type, db->config->log_dest);
 			flag_reload = false;
 		}
-		if(flag_tree_print){
+		if(flag_tree_print){//直接printf一下订阅的树形结构，线上慎用
 			mqtt3_sub_tree_print(&db->subs, 0);
 			flag_tree_print = false;
 		}

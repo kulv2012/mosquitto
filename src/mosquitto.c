@@ -129,7 +129,7 @@ void handle_sigusr1(int signal)
 
 /* Signal handler for SIGUSR2 - vacuum the db. */
 void handle_sigusr2(int signal)
-{
+{//vacuum，真空
 	flag_tree_print = true;
 }
 
@@ -249,7 +249,7 @@ int main(int argc, char *argv[])
 	signal(SIGTERM, handle_sigint);
 	signal(SIGHUP, handle_sighup);
 	signal(SIGUSR1, handle_sigusr1);
-	signal(SIGUSR2, handle_sigusr2);
+	signal(SIGUSR2, handle_sigusr2);//直接printf一下订阅的树形结构，线上慎用，太大 
 	signal(SIGPIPE, SIG_IGN);
 
 

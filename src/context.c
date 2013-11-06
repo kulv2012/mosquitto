@@ -70,6 +70,7 @@ struct mosquitto *mqtt3_context_init(int sock)
 	context->current_out_packet = NULL;
 
 	context->address = NULL;
+	//获取客户端的IP地址，这个可以考虑在accept的时候设置，避免一次系统调用
 	if(!_mosquitto_socket_get_address(sock, address, 1024)){
 		context->address = _mosquitto_strdup(address);
 	}
@@ -104,7 +105,7 @@ void mqtt3_context_cleanup(struct mosquitto_db *db, struct mosquitto *context, b
 		_mosquitto_free(context->password);
 		context->password = NULL;
 	}
-	if(context->sock != -1){
+	if(context->sock != -1){//关闭这个连接
 		if(context->listener){
 			context->listener->client_count--;
 			assert(context->listener->client_count >= 0);

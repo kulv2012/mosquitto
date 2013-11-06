@@ -62,7 +62,7 @@ struct _mqtt3_listener {
 	char *mount_point;
 	int *socks;//由于可能hostname为域名等，一条listener可能需要花费多个sock套接字句柄，所以为数组.所有的sock放在main()的局部变量listensock上面
 	int sock_count;//上面socks数组的个数
-	int client_count;
+	int client_count;//这个listener上面的客户连接数目
 };
 
 struct mqtt3_config {
@@ -70,8 +70,8 @@ struct mqtt3_config {
 	char *acl_file;
 	bool allow_anonymous;
 	bool allow_duplicate_messages;
-	int autosave_interval;
-	bool autosave_on_changes;
+	int autosave_interval;//自动保存db文件持久化的间隔时间或者最大累积条数，依赖autosave_on_changes
+	bool autosave_on_changes;//如果设置了，那么累积autosave_interval这么多条数据后，会持久化，否则autosave_interval就是保存间隔时间
 	char *clientid_prefixes;
 	bool connection_messages;
 	bool daemon;
@@ -184,18 +184,18 @@ struct _clientid_index_hash{
 
 struct mosquitto_db{
 	dbid_t last_db_id;
-	struct _mosquitto_subhier subs;
+	struct _mosquitto_subhier subs;//树形的订阅关系列表
 	struct _mosquitto_unpwd *unpwd;
 	struct _mosquitto_acl_user *acl_list;
 	struct _mosquitto_acl *acl_patterns;
 	struct _mosquitto_unpwd *psk_id;
-	struct mosquitto **contexts;
+	struct mosquitto **contexts;//注意这个地方会不断变化，所以不要指向这个数组
 	struct _clientid_index_hash *clientid_index_hash;
 	int context_count;
 	struct mosquitto_msg_store *msg_store;
 	int msg_store_count;
 	struct mqtt3_config *config;
-	int persistence_changes;
+	int persistence_changes;//如果autosave_on_changes设置了，那么这里用来累积计数修改了多少条数据，达到autosave_interval后就会持久化
 	struct _mosquitto_auth_plugin auth_plugin;
 	int subscription_count;
 	int retained_count;

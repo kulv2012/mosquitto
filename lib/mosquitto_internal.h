@@ -66,7 +66,7 @@ enum mosquitto_msg_state {
 	mosq_ms_resend_pubcomp = 8,
 	mosq_ms_wait_for_pubcomp = 9,
 	mosq_ms_send_pubrec = 10,
-	mosq_ms_queued = 11
+	mosq_ms_queued = 11	//消息等待发送
 };
 
 enum mosquitto_client_state {
@@ -113,7 +113,7 @@ struct mosquitto {
 	time_t last_msg_out;
 	time_t ping_t;
 	uint16_t last_mid;
-	struct _mosquitto_packet in_packet;
+	struct _mosquitto_packet in_packet;//客户端发送过来的最后一个包
 	struct _mosquitto_packet *current_out_packet;//当前正在发送中的数据包，可能只发送了一部分
 	struct _mosquitto_packet *out_packet;//待发送出去的包的链表
 	struct mosquitto_message *will;
@@ -134,10 +134,10 @@ struct mosquitto {
 	struct _mqtt3_bridge *bridge;
 	struct mosquitto_client_msg *msgs;
 	struct _mosquitto_acl_user *acl_list;
-	struct _mqtt3_listener *listener;
+	struct _mqtt3_listener *listener; //直线我所属的listener的db->config->listeners[i]位置
 	time_t disconnect_t;
 	int pollfd_index;
-	int db_index;
+	int db_index;//记住我在db->contexts中的下标
 	struct _mosquitto_packet *out_packet_last;
 #else
 	void *userdata;
