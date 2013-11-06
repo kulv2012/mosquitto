@@ -62,7 +62,7 @@ int mqtt3_log_init(int priorities, int destinations)
 
 	log_priorities = priorities;
 	log_destinations = destinations;
-
+	//如果配置了用syslog,则打开系统日志，进行初始化
 	if(log_destinations & MQTT3_LOG_SYSLOG){
 		openlog("mosquitto", LOG_PID, LOG_DAEMON);
 	}
@@ -124,7 +124,7 @@ int _mosquitto_log_printf(struct mosquitto *mosq, int priority, const char *fmt,
 				topic = "$SYS/broker/log/E";
 				syslog_priority = LOG_ERR;
 		}
-		len = strlen(fmt) + 500;
+		len = strlen(fmt) + 500;//够山寨,日志后面的可变参数部分最长限制为500个字符
 		s = _mosquitto_malloc(len*sizeof(char));
 		if(!s) return MOSQ_ERR_NOMEM;
 
@@ -150,6 +150,7 @@ int _mosquitto_log_printf(struct mosquitto *mosq, int priority, const char *fmt,
 			fflush(stderr);
 		}
 		if(log_destinations & MQTT3_LOG_FILE && int_db.config->log_fptr){
+			//直接fprintf到文件里面去，多线程岂不悲剧了,fprintf里面是有锁的，性能很低，而且程序一会挂了可能日志没有记录进去，这是最悲剧的
 			if(int_db.config && int_db.config->log_timestamp){
 				fprintf(int_db.config->log_fptr, "%d: %s\n", (int)now, s);
 			}else{

@@ -85,7 +85,7 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 #endif
 
 		if(listensock_count + db->context_count > pollfd_count){
-			pollfd_count = listensock_count + db->context_count;
+			pollfd_count = listensock_count + db->context_count;//申请pollfd数组存储
 			pollfds = _mosquitto_realloc(pollfds, sizeof(struct pollfd)*pollfd_count);
 			if(!pollfds){
 				_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Out of memory.");
