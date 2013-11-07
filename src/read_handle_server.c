@@ -68,11 +68,12 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 #endif
 
 	/* Don't accept multiple CONNECT commands. */
-	if(context->state != mosq_cs_new){
+	if(context->state != mosq_cs_new){//已经connect过了
 		mqtt3_context_disconnect(db, context);
 		return MOSQ_ERR_PROTOCOL;
 	}
 
+	//读取开头的协议名称
 	if(_mosquitto_read_string(&context->in_packet, &protocol_name)){
 		mqtt3_context_disconnect(db, context);
 		return 1;
@@ -81,7 +82,7 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 		mqtt3_context_disconnect(db, context);
 		return 3;
 	}
-	if(strcmp(protocol_name, PROTOCOL_NAME)){
+	if(strcmp(protocol_name, PROTOCOL_NAME)){//协议名必须为"MQIsdp"
 		if(db->config->connection_messages == true){
 			_mosquitto_log_printf(NULL, MOSQ_LOG_INFO, "Invalid protocol \"%s\" in CONNECT from %s.",
 					protocol_name, context->address);
@@ -89,14 +90,14 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 		_mosquitto_free(protocol_name);
 		mqtt3_context_disconnect(db, context);
 		return MOSQ_ERR_PROTOCOL;
-	}
+	}//协议名只是为了检验是否为"MQIsdp"的，只后就没用啦 
 	_mosquitto_free(protocol_name);
 
-	if(_mosquitto_read_byte(&context->in_packet, &protocol_version)){
+	if(_mosquitto_read_byte(&context->in_packet, &protocol_version)){//8 个字节的协议号
 		mqtt3_context_disconnect(db, context);
 		return 1;
 	}
-	if((protocol_version&0x7F) != PROTOCOL_VERSION){
+	if((protocol_version&0x7F) != PROTOCOL_VERSION){//协议名必须是3版本
 		if(db->config->connection_messages == true){
 			_mosquitto_log_printf(NULL, MOSQ_LOG_INFO, "Invalid protocol version %d in CONNECT from %s.",
 					protocol_version, context->address);
@@ -105,10 +106,11 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 		mqtt3_context_disconnect(db, context);
 		return MOSQ_ERR_PROTOCOL;
 	}
-	if((protocol_version&0x80) == 0x80){
+	if((protocol_version&0x80) == 0x80){//发送这种协议来的，就认为是bridge
 		context->is_bridge = true;
 	}
 
+	//下面读取各个标志
 	if(_mosquitto_read_byte(&context->in_packet, &connect_flags)){
 		mqtt3_context_disconnect(db, context);
 		return 1;

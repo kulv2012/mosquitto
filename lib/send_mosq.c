@@ -71,6 +71,7 @@ int _mosquitto_send_pingresp(struct mosquitto *mosq)
 #else
 	if(mosq) _mosquitto_log_printf(mosq, MOSQ_LOG_DEBUG, "Client %s sending PINGRESP", mosq->id);
 #endif
+	//发送一条简单的PINGRESP回包，不用记录任何状态。数据包会放到mosq->out_packet链表末尾。
 	return _mosquitto_send_simple_command(mosq, PINGRESP);
 }
 
@@ -173,7 +174,7 @@ int _mosquitto_send_command_with_mid(struct mosquitto *mosq, uint8_t command, ui
 
 /* For DISCONNECT, PINGREQ and PINGRESP */
 int _mosquitto_send_simple_command(struct mosquitto *mosq, uint8_t command)
-{
+{//发送简单的命令，没有数据的
 	struct _mosquitto_packet *packet = NULL;
 	int rc;
 
@@ -184,12 +185,12 @@ int _mosquitto_send_simple_command(struct mosquitto *mosq, uint8_t command)
 	packet->command = command;
 	packet->remaining_length = 0;
 
-	rc = _mosquitto_packet_alloc(packet);
+	rc = _mosquitto_packet_alloc(packet);//分配一个包的payload负载数据，里面会存储fixheader 
 	if(rc){
 		_mosquitto_free(packet);
 		return rc;
 	}
-
+	//将packet参数指向的包放入mosq->out_packet链表的尾部，并顺带触发一次数据发送
 	return _mosquitto_packet_queue(mosq, packet);
 }
 

@@ -48,11 +48,11 @@ int mqtt3_packet_handle(struct mosquitto_db *db, struct mosquitto *context)
 {
 	if(!context) return MOSQ_ERR_INVAL;
 
-	switch((context->in_packet.command)&0xF0){
+	switch((context->in_packet.command)&0xF0){//高4位为消息类型
 		case PINGREQ:
-			return _mosquitto_handle_pingreq(context);
+			return _mosquitto_handle_pingreq(context);//简单给客户端发送PINGREQ包就行
 		case PINGRESP:
-			return _mosquitto_handle_pingresp(context);
+			return _mosquitto_handle_pingresp(context);//不需要额外处理
 		case PUBACK:
 			return _mosquitto_handle_pubackcomp(context, "PUBACK");
 		case PUBCOMP:

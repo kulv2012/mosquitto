@@ -98,27 +98,27 @@ void _mosquitto_packet_cleanup(struct _mosquitto_packet *packet)
 }
 
 int _mosquitto_packet_queue(struct mosquitto *mosq, struct _mosquitto_packet *packet)
-{
+{//将packet参数指向的包放入mosq->out_packet链表的尾部，并顺带触发一次数据发送
 	assert(mosq);
 	assert(packet);
 
-	packet->pos = 0;
-	packet->to_process = packet->packet_length;
+	packet->pos = 0;//后续要从这里开始发送
+	packet->to_process = packet->packet_length;//初始化的时候，一个包啥都没有发送出去
 
 	packet->next = NULL;
 	pthread_mutex_lock(&mosq->out_packet_mutex);
-	if(mosq->out_packet){
+	if(mosq->out_packet){//out_packet用来建立要发送的包的列表,将新数据放到末尾
 		mosq->out_packet_last->next = packet;
 	}else{
-		mosq->out_packet = packet;
+		mosq->out_packet = packet;//就一个
 	}
 	mosq->out_packet_last = packet;
 	pthread_mutex_unlock(&mosq->out_packet_mutex);
 #ifdef WITH_BROKER
-	return _mosquitto_packet_write(mosq);
+	return _mosquitto_packet_write(mosq);//尝试发送一次
 #else
 	if(mosq->in_callback == false && mosq->threaded == false){
-		return _mosquitto_packet_write(mosq);
+		return _mosquitto_packet_write(mosq);//客户端尽量触发一下数据写发送
 	}else{
 		return MOSQ_ERR_SUCCESS;
 	}
@@ -295,17 +295,17 @@ void _mosquitto_write_bytes(struct _mosquitto_packet *packet, const void *bytes,
 }
 
 int _mosquitto_read_string(struct _mosquitto_packet *packet, char **str)
-{
+{//Length MSB | Length LSB | 字符串 
 	uint16_t len;
 	int rc;
 
 	assert(packet);
-	rc = _mosquitto_read_uint16(packet, &len);
+	rc = _mosquitto_read_uint16(packet, &len);//字符串长度
 	if(rc) return rc;
 
 	if(packet->pos+len > packet->remaining_length) return MOSQ_ERR_PROTOCOL;
 
-	*str = _mosquitto_calloc(len+1, sizeof(char));
+	*str = _mosquitto_calloc(len+1, sizeof(char));//申请一个字符串内存，存放字符串
 	if(*str){
 		memcpy(*str, &(packet->payload[packet->pos]), len);
 		packet->pos += len;
@@ -444,6 +444,7 @@ int _mosquitto_packet_write(struct mosquitto *mosq)
 		}
 		pthread_mutex_unlock(&mosq->out_packet_mutex);
 
+		//释放删除这个包，这里不需要处理状态的问题
 		_mosquitto_packet_cleanup(packet);
 		_mosquitto_free(packet);
 
@@ -481,6 +482,7 @@ int _mosquitto_packet_read(struct mosquitto *mosq)
 	 * After all data is read, send to _mosquitto_handle_packet() to deal with.
 	 * Finally, free the memory and reset everything to starting conditions.
 	 */
+	//第一步，读取fixed header第一个字节command
 	if(!mosq->in_packet.command){//还没有读取一个字节，所以先读取头部
 		read_length = _mosquitto_net_read(mosq, &byte, 1);
 		if(read_length == 1){
@@ -492,7 +494,7 @@ int _mosquitto_packet_read(struct mosquitto *mosq)
 			/* Clients must send CONNECT as their first command. */
 			if(!(mosq->bridge) && mosq->state == mosq_cs_new && (byte&0xF0) != CONNECT) return MOSQ_ERR_PROTOCOL;
 #endif
-		}else{//出错了或者暂时没有数据可读
+		}else{//出错了或者暂时没有数据可读,得暂时返回
 			if(read_length == 0) return MOSQ_ERR_CONN_LOST; /* EOF */
 			if(errno == EAGAIN || errno == COMPAT_EWOULDBLOCK){
 				return MOSQ_ERR_SUCCESS;
@@ -506,13 +508,14 @@ int _mosquitto_packet_read(struct mosquitto *mosq)
 			}
 		}
 	}
+	//第二步读取后面的数据长度字段
 	if(!mosq->in_packet.have_remaining){//还没有读取到remaining length
 		/* Read remaining
 		 * Algorithm for decoding taken from pseudo code at
 		 * http://publib.boulder.ibm.com/infocenter/wmbhelp/v6r0m0/topic/com.ibm.etools.mft.doc/ac10870_.htm
 		 */
 		do{
-			read_length = _mosquitto_net_read(mosq, &byte, 1);
+			read_length = _mosquitto_net_read(mosq, &byte, 1);//一次读取一个字节，亲，这是系统调用啊····
 			if(read_length == 1){
 				mosq->in_packet.remaining_count++;
 				/* Max 4 bytes length for remaining length as defined by protocol.

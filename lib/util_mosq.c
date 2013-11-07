@@ -45,7 +45,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 int _mosquitto_packet_alloc(struct _mosquitto_packet *packet)
-{
+{//分配一个包的payload负载数据，里面会存储fixheader
 	uint8_t remaining_bytes[5], byte;
 	uint32_t remaining_length;
 	int i;
@@ -70,8 +70,9 @@ int _mosquitto_packet_alloc(struct _mosquitto_packet *packet)
 	packet->payload = _mosquitto_malloc(sizeof(uint8_t)*packet->packet_length);
 	if(!packet->payload) return MOSQ_ERR_NOMEM;
 
-	packet->payload[0] = packet->command;
-	for(i=0; i<packet->remaining_count; i++){
+	//发送数据的刷花，payload竟然为所有包，包括包头!接收的刷花payload只代表remaing后面的部分的
+	packet->payload[0] = packet->command;//包头
+	for(i=0; i<packet->remaining_count; i++){//后面的数据长度
 		packet->payload[i+1] = remaining_bytes[i];
 	}
 	packet->pos = 1 + packet->remaining_count;

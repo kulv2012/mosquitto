@@ -45,7 +45,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #endif
 
 int _mosquitto_handle_pingreq(struct mosquitto *mosq)
-{
+{//没有负载数据。The PINGREQ message is an "are you alive?" message that is sent from a connected	client to the server.
 	assert(mosq);
 #ifdef WITH_STRICT_PROTOCOL
 	if(mosq->in_packet.remaining_length != 0){
@@ -57,11 +57,12 @@ int _mosquitto_handle_pingreq(struct mosquitto *mosq)
 #else
 	_mosquitto_log_printf(mosq, MOSQ_LOG_DEBUG, "Client %s received PINGREQ", mosq->id);
 #endif
+	//收到客户端的PING后，我们只需要立即发送PINGRESP回包
 	return _mosquitto_send_pingresp(mosq);
 }
 
 int _mosquitto_handle_pingresp(struct mosquitto *mosq)
-{
+{//简单返回，更新ping_t就行
 	assert(mosq);
 #ifdef WITH_STRICT_PROTOCOL
 	if(mosq->in_packet.remaining_length != 0){

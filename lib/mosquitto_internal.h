@@ -78,14 +78,14 @@ enum mosquitto_client_state {
 };
 
 struct _mosquitto_packet{
-	uint8_t command;
-	uint8_t have_remaining;
-	uint8_t remaining_count;
+	uint8_t command;//4 Message Type|1 DUP flag|2 QoS level|1 RETAIN
+	uint8_t have_remaining;//是否已经读取完了remaining length字段
+	uint8_t remaining_count;// remaining字段包含几个字节
 	uint16_t mid;
 	uint32_t remaining_mult;
-	uint32_t remaining_length;
+	uint32_t remaining_length;//remaining字段的表示的长度，也就是数据长度
 	uint32_t packet_length;
-	uint32_t to_process;
+	uint32_t to_process;//还有这么多数据没有读取完成
 	uint32_t pos;
 	uint8_t *payload;
 	struct _mosquitto_packet *next;
@@ -106,7 +106,7 @@ struct mosquitto {
 	char *id;
 	char *username;
 	char *password;
-	uint16_t keepalive;
+	uint16_t keepalive;//客户端发送过来的keepalive时间
 	bool clean_session;
 	enum mosquitto_client_state state;
 	time_t last_msg_in;
@@ -138,7 +138,7 @@ struct mosquitto {
 	time_t disconnect_t;
 	int pollfd_index;
 	int db_index;//记住我在db->contexts中的下标
-	struct _mosquitto_packet *out_packet_last;
+	struct _mosquitto_packet *out_packet_last;//快速指向待输出数据列表的索引，mosq->out_packet_last->next = packet
 #else
 	void *userdata;
 	bool in_callback;

@@ -178,8 +178,10 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 		if(fdcount == -1){
 			loop_handle_errors(db, pollfds);
 		}else{
+			//处理客户端连接的读写事件，里面是扫描所有sock的
 			loop_handle_reads_writes(db, pollfds);
 
+			//独立处理listen端口
 			for(i=0; i<listensock_count; i++){
 				if(pollfds[i].revents & (POLLIN | POLLPRI)){
 					//listen sock可读的时候可能有多个新连接，需要循环accept
@@ -262,15 +264,16 @@ static void loop_handle_errors(struct mosquitto_db *db, struct pollfd *pollfds)
 }
 
 static void loop_handle_reads_writes(struct mosquitto_db *db, struct pollfd *pollfds)
-{
+{//mosquitto_main_loop调用这里来处理客户端连接的读写事件
 	int i;
 
 	for(i=0; i<db->context_count; i++){
+		//循环遍历每一个客户端连接，根据pollfd_index找到其在pollfds数组中的元素，看其是否有事件可以处理的
 		if(db->contexts[i] && db->contexts[i]->sock != INVALID_SOCKET){
 			assert(pollfds[db->contexts[i]->pollfd_index].fd == db->contexts[i]->sock);
 			if(pollfds[db->contexts[i]->pollfd_index].revents & POLLOUT){
 				//连接可写，则尝试发送数据
-				if(_mosquitto_packet_write(db->contexts[i])){
+				if(_mosquitto_packet_write(db->contexts[i])){//将mosq->out_packet链表上的数据发送出去
 					if(db->config->connection_messages == true){
 						if(db->contexts[i]->state != mosq_cs_disconnecting){
 							_mosquitto_log_printf(NULL, MOSQ_LOG_NOTICE, "Socket write error on client %s, disconnecting.", db->contexts[i]->id);
@@ -286,7 +289,7 @@ static void loop_handle_reads_writes(struct mosquitto_db *db, struct pollfd *pol
 		if(db->contexts[i] && db->contexts[i]->sock != INVALID_SOCKET){
 			assert(pollfds[db->contexts[i]->pollfd_index].fd == db->contexts[i]->sock);
 			if(pollfds[db->contexts[i]->pollfd_index].revents & POLLIN){
-				//连接可读，则读取出书病处理之
+				//连接可读，则读取出数据并处理之
 				if(_mosquitto_packet_read(db, db->contexts[i])){
 					if(db->config->connection_messages == true){
 						if(db->contexts[i]->state != mosq_cs_disconnecting){

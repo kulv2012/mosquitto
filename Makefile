@@ -1,15 +1,10 @@
 include config.mk
 
 DIRS=lib client src
-DOCDIRS=man
-DISTDIRS=man
 
-.PHONY : all mosquitto docs binary clean reallyclean test install uninstall dist sign copy
+.PHONY : all mosquitto binary clean reallyclean test install uninstall sign copy
 
-all : mosquitto docs
-
-docs :
-	set -e; for d in ${DOCDIRS}; do $(MAKE) -C $${d}; done
+all : mosquitto
 
 binary : mosquitto
 
@@ -18,12 +13,10 @@ mosquitto :
 
 clean :
 	set -e; for d in ${DIRS}; do $(MAKE) -C $${d} clean; done
-	set -e; for d in ${DOCDIRS}; do $(MAKE) -C $${d} clean; done
 	$(MAKE) -C test clean
 
 reallyclean : 
 	set -e; for d in ${DIRS}; do $(MAKE) -C $${d} reallyclean; done
-	set -e; for d in ${DOCDIRS}; do $(MAKE) -C $${d} reallyclean; done
 	$(MAKE) -C test reallyclean
 	-rm -f *.orig
 
@@ -32,7 +25,6 @@ test : mosquitto
 
 install : mosquitto
 	set -e; for d in ${DIRS}; do $(MAKE) -C $${d} install; done
-	set -e; for d in ${DOCDIRS}; do $(MAKE) -C $${d} install; done
 	$(INSTALL) -d ${DESTDIR}/etc/mosquitto
 	$(INSTALL) -m 644 mosquitto.conf ${DESTDIR}/etc/mosquitto/mosquitto.conf.example
 	$(INSTALL) -m 644 aclfile.example ${DESTDIR}/etc/mosquitto/aclfile.example
@@ -47,7 +39,6 @@ uninstall :
 	rm -f ${DESTDIR}/etc/mosquitto/pskfile.example
 
 dist : reallyclean
-	set -e; for d in ${DISTDIRS}; do $(MAKE) -C $${d} dist; done
 	
 	echo $$(hg log -r . --template "{node}") > changeset
 	mkdir -p dist/mosquitto-${VERSION}
