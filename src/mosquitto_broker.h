@@ -190,7 +190,7 @@ struct mosquitto_db{
 	struct _mosquitto_acl *acl_patterns;
 	struct _mosquitto_unpwd *psk_id;
 	struct mosquitto **contexts;//注意这个地方会不断变化，所以不要指向这个数组
-	struct _clientid_index_hash *clientid_index_hash;
+	struct _clientid_index_hash *clientid_index_hash;//所有客户端id的哈希表,用来快速找到这个客户端在db->contexts数组中的位置的
 	int context_count;
 	struct mosquitto_msg_store *msg_store;
 	int msg_store_count;

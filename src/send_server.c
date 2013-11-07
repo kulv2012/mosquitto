@@ -35,7 +35,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <util_mosq.h>
 
 int _mosquitto_send_connack(struct mosquitto *context, int result)
-{
+{//发送一个带2个数字的CONNACK回包给客户端，告诉他连接成功
 	struct _mosquitto_packet *packet = NULL;
 	int rc;
 

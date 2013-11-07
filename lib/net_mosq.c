@@ -581,6 +581,7 @@ int _mosquitto_packet_read(struct mosquitto *mosq)
 		g_pub_msgs_received++;
 	}
 #  endif
+	//这个数据包读取完毕，后面就开处理
 	rc = mqtt3_packet_handle(db, mosq);
 #else
 	rc = _mosquitto_packet_handle(mosq);
