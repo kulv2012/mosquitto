@@ -103,7 +103,7 @@ struct mosquitto_message_all{
 struct mosquitto {
 	int sock;
 	char *address;
-	char *id;
+	char *id;//客户端的id
 	char *username;
 	char *password;
 	uint16_t keepalive;//客户端发送过来的keepalive时间
@@ -134,7 +134,7 @@ struct mosquitto {
 	struct _mqtt3_bridge *bridge;
 	struct mosquitto_client_msg *msgs;
 	struct _mosquitto_acl_user *acl_list;
-	struct _mqtt3_listener *listener; //直线我所属的listener的db->config->listeners[i]位置
+	struct _mqtt3_listener *listener; //指向我所属的listener的db->config->listeners[i]位置
 	time_t disconnect_t;
 	int pollfd_index;
 	int db_index;//记住我在db->contexts中的下标

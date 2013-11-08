@@ -155,7 +155,8 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 		}
 	}
 
-	if(will){//刚开始的时候将Will Message消息发布到Will Topic指代的地方，这里暂时只读取数据
+	if(will){//will指的是如果客户端意外断开连接，那么will Message内容的字符串消息会发布到Will Topic指代的地方
+		//申请一个message结构，待会填充到context->will上面
 		will_struct = _mosquitto_calloc(1, sizeof(struct mosquitto_message));
 		if(!will_struct){
 			mqtt3_context_disconnect(db, context);
@@ -174,6 +175,7 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 			rc = 1;
 			goto handle_connect_error;
 		}
+		//由于需要记录长度，所以不能一次读取_mosquitto_read_string
 		if(_mosquitto_read_uint16(&context->in_packet, &will_payloadlen)){
 			mqtt3_context_disconnect(db, context);
 			rc = 1;
@@ -289,7 +291,7 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 	context->ping_t = 0;
 
 	// Add the client ID to the DB hash table here
-	//已经在里面的不需要增加进去了吧
+	//已经在里面的不需要增加进去了吧,不是，在mqtt3_context_cleanup里面又del掉了···还得加一次
 	new_cih = _mosquitto_malloc(sizeof(struct _clientid_index_hash));
 	if(!new_cih){
 		_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Out of memory.");
@@ -327,7 +329,7 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 		context->acl_list = NULL;
 	}
 
-	if(will_struct){
+	if(will_struct){//设置will-topic的相关信息，mqtt3_context_disconnect会用，判断连接不是主动断开的话会Publis一条消息
 		if(mosquitto_acl_check(db, context, will_topic, MOSQ_ACL_WRITE) != MOSQ_ERR_SUCCESS){
 			_mosquitto_send_connack(context, CONNACK_REFUSED_NOT_AUTHORIZED);
 			mqtt3_context_disconnect(db, context);
@@ -373,7 +375,7 @@ int mqtt3_handle_disconnect(struct mosquitto_db *db, struct mosquitto *context)
 		return MOSQ_ERR_PROTOCOL;
 	}
 	_mosquitto_log_printf(NULL, MOSQ_LOG_DEBUG, "Received DISCONNECT from %s", context->id);
-	context->state = mosq_cs_disconnecting;
+	context->state = mosq_cs_disconnecting;//设置主动断开标识，不会发送will-topic
 	mqtt3_context_disconnect(db, context);
 	return MOSQ_ERR_SUCCESS;
 }
@@ -386,7 +388,7 @@ int mqtt3_handle_subscribe(struct mosquitto_db *db, struct mosquitto *context)
 	uint16_t mid;
 	char *sub;
 	uint8_t qos;
-	uint8_t *payload = NULL, *tmp_payload;
+	uint8_t *payload = NULL, *tmp_payload;//SUB的返回包为SUBACK，结构为每一行代表对应的一个topic的QOS
 	uint32_t payloadlen = 0;
 	int len;
 	char *sub_mount;
@@ -398,6 +400,7 @@ int mqtt3_handle_subscribe(struct mosquitto_db *db, struct mosquitto *context)
 	if(_mosquitto_read_uint16(&context->in_packet, &mid)) return 1;
 
 	while(context->in_packet.pos < context->in_packet.remaining_length){
+		//SUBSCRIBE消息包括msgid，后面就是topic的列表,一个个取就行
 		sub = NULL;
 		if(_mosquitto_read_string(&context->in_packet, &sub)){
 			if(payload) _mosquitto_free(payload);
@@ -405,7 +408,7 @@ int mqtt3_handle_subscribe(struct mosquitto_db *db, struct mosquitto *context)
 		}
 
 		if(sub){
-			if(_mosquitto_read_byte(&context->in_packet, &qos)){
+			if(_mosquitto_read_byte(&context->in_packet, &qos)){//1个byte的QOS，高位6为空
 				_mosquitto_free(sub);
 				if(payload) _mosquitto_free(payload);
 				return 1;
@@ -417,7 +420,7 @@ int mqtt3_handle_subscribe(struct mosquitto_db *db, struct mosquitto *context)
 				if(payload) _mosquitto_free(payload);
 				return 1;
 			}
-			if(_mosquitto_fix_sub_topic(&sub)){
+			if(_mosquitto_fix_sub_topic(&sub)){//把重复的斜杠去掉://////some//aa// -> some/aa/
 				_mosquitto_free(sub);
 				if(payload) _mosquitto_free(payload);
 				return 1;
@@ -454,9 +457,9 @@ int mqtt3_handle_subscribe(struct mosquitto_db *db, struct mosquitto *context)
 			_mosquitto_free(sub);
 
 			tmp_payload = _mosquitto_realloc(payload, payloadlen + 1);
-			if(tmp_payload){
+			if(tmp_payload){//这是要返回给客户端的QOS列表,一一对应
 				payload = tmp_payload;
-				payload[payloadlen] = qos;
+				payload[payloadlen] = qos;//QOS级别不变？如果本身的topic的级别不够的话怎么办
 				payloadlen++;
 			}else{
 				if(payload) _mosquitto_free(payload);

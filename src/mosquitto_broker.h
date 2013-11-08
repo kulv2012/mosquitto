@@ -59,7 +59,7 @@ struct _mqtt3_listener {
 	char *host;
 	uint16_t port;
 	int max_connections;
-	char *mount_point;
+	car *mount_point;//配置项，代表本broker里面的所有topic的前缀。注意跟其他客户端是不可见的。
 	int *socks;//由于可能hostname为域名等，一条listener可能需要花费多个sock套接字句柄，所以为数组.所有的sock放在main()的局部变量listensock上面
 	int sock_count;//上面socks数组的个数
 	int client_count;//这个listener上面的客户连接数目
@@ -68,7 +68,7 @@ struct _mqtt3_listener {
 struct mqtt3_config {
 	char *config_file;
 	char *acl_file;
-	bool allow_anonymous;
+	bool allow_anonymous;//是否允许免密码登陆使用
 	bool allow_duplicate_messages;
 	int autosave_interval;//自动保存db文件持久化的间隔时间或者最大累积条数，依赖autosave_on_changes
 	bool autosave_on_changes;//如果设置了，那么累积autosave_interval这么多条数据后，会持久化，否则autosave_interval就是保存间隔时间

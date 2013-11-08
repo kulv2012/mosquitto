@@ -164,9 +164,9 @@ static int _sub_topic_tokenise(const char *subtopic, struct _sub_token **topics)
 
 	local_subtopic = _mosquitto_strdup(subtopic);
 	if(!local_subtopic) return MOSQ_ERR_NOMEM;
-	real_subtopic = local_subtopic;
+	real_subtopic = local_subtopic;//记住头部，待会师范这个空间。
 
-	if(local_subtopic[0] == '/'){
+	if(local_subtopic[0] == '/'){//第一个斜杠也算
 		new_topic = _mosquitto_malloc(sizeof(struct _sub_token));
 		if(!new_topic) goto cleanup;
 		new_topic->next = NULL;
@@ -180,7 +180,7 @@ static int _sub_topic_tokenise(const char *subtopic, struct _sub_token **topics)
 	}
 
 	token = strtok_r(local_subtopic, "/", &saveptr);
-	while(token){
+	while(token){//一节一节的处理，形成一个链表
 		new_topic = _mosquitto_malloc(sizeof(struct _sub_token));
 		if(!new_topic) goto cleanup;
 		new_topic->next = NULL;
@@ -367,7 +367,7 @@ int mqtt3_sub_add(struct mosquitto_db *db, struct mosquitto *context, const char
 	assert(root);
 	assert(sub);
 
-	if(!strncmp(sub, "$SYS/", 5)){
+	if(!strncmp(sub, "$SYS/", 5)){//系统属性等区别对待
 		tree = 2;
 		if(strlen(sub+5) == 0) return MOSQ_ERR_SUCCESS;
 		if(_sub_topic_tokenise(sub+5, &tokens)) return 1;
