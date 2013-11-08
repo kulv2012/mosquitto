@@ -132,7 +132,7 @@ struct mosquitto {
 #ifdef WITH_BROKER
 	bool is_bridge;
 	struct _mqtt3_bridge *bridge;
-	struct mosquitto_client_msg *msgs;
+	struct mosquitto_client_msg *msgs;//这个连接的消息链表,新的放在后面
 	struct _mosquitto_acl_user *acl_list;
 	struct _mqtt3_listener *listener; //指向我所属的listener的db->config->listeners[i]位置
 	time_t disconnect_t;

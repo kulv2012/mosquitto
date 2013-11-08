@@ -92,7 +92,7 @@ struct mqtt3_config {
 	time_t persistent_client_expiration;
 	char *pid_file;
 	char *psk_file;
-	bool queue_qos0_messages;
+	bool queue_qos0_messages;//如果客户端挂了，qos0的消息是否保存离线记录
 	int retry_interval;
 	int store_clean_interval;
 	int sys_interval;
@@ -107,32 +107,32 @@ struct mqtt3_config {
 struct _mosquitto_subleaf {
 	struct _mosquitto_subleaf *prev;
 	struct _mosquitto_subleaf *next;
-	struct mosquitto *context;
+	struct mosquitto *context;//指向订阅的客户端连接，
 	int qos;
 };
 
 struct _mosquitto_subhier {
-	struct _mosquitto_subhier *children;
+	struct _mosquitto_subhier *children;//这个节点的下一级节点链表
 	struct _mosquitto_subhier *next;
-	struct _mosquitto_subleaf *subs;
+	struct _mosquitto_subleaf *subs;//一个节点上订阅的客户端链表
 	char *topic;
 	struct mosquitto_msg_store *retained;
 };
 
-struct mosquitto_msg_store{
+struct mosquitto_msg_store{//这是服务端记录的消息结构
 	struct mosquitto_msg_store *next;
 	dbid_t db_id;
-	int ref_count;
+	int ref_count;//被多少mosquitto_client_msg客户端消息引用了
 	char *source_id;
-	char **dest_ids;
+	char **dest_ids;//这条消息已经送达的id列表，配置allow_duplicate_messages了的话，这里就有用了
 	int dest_id_count;
 	uint16_t source_mid;
 	struct mosquitto_message msg;
 };
 
-struct mosquitto_client_msg{
+struct mosquitto_client_msg{//这是要发送给客户端的消息结构
 	struct mosquitto_client_msg *next;
-	struct mosquitto_msg_store *store;
+	struct mosquitto_msg_store *store;///指向这条消息的综合结构
 	uint16_t mid;
 	int qos;
 	bool retain;
@@ -183,8 +183,8 @@ struct _clientid_index_hash{
 };
 
 struct mosquitto_db{
-	dbid_t last_db_id;
-	struct _mosquitto_subhier subs;//树形的订阅关系列表
+	dbid_t last_db_id;//msg_store上的消息的顺序id
+	struct _mosquitto_subhier subs;//树形的订阅关系列表.该链表第一个节点为正常的topic订阅节点，第二个为$SYS系统状态订阅节点
 	struct _mosquitto_unpwd *unpwd;
 	struct _mosquitto_acl_user *acl_list;
 	struct _mosquitto_acl *acl_patterns;
@@ -192,12 +192,12 @@ struct mosquitto_db{
 	struct mosquitto **contexts;//注意这个地方会不断变化，所以不要指向这个数组
 	struct _clientid_index_hash *clientid_index_hash;//所有客户端id的哈希表,用来快速找到这个客户端在db->contexts数组中的位置的
 	int context_count;
-	struct mosquitto_msg_store *msg_store;
+	struct mosquitto_msg_store *msg_store;//这里是所有publish的消息，都在这.新消息插入头部
 	int msg_store_count;
 	struct mqtt3_config *config;
 	int persistence_changes;//如果autosave_on_changes设置了，那么这里用来累积计数修改了多少条数据，达到autosave_interval后就会持久化
 	struct _mosquitto_auth_plugin auth_plugin;
-	int subscription_count;
+	int subscription_count;//总订阅量
 	int retained_count;
 };
 

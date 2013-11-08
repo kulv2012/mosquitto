@@ -64,7 +64,7 @@ int _mosquitto_send_connack(struct mosquitto *context, int result)
 }
 
 int _mosquitto_send_suback(struct mosquitto *context, uint16_t mid, uint32_t payloadlen, const void *payload)
-{
+{//给当前客户端发送一个回包，内容在参数payload上面
 	struct _mosquitto_packet *packet = NULL;
 	int rc;
 

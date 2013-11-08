@@ -64,13 +64,13 @@ int mqtt3_packet_handle(struct mosquitto_db *db, struct mosquitto *context)
 		case PUBREL:
 			return _mosquitto_handle_pubrel(db, context);
 		case CONNECT:
-			return mqtt3_handle_connect(db, context);
+			return mqtt3_handle_connect(db, context);//带密码登陆/重登陆
 		case DISCONNECT:
 			return mqtt3_handle_disconnect(db, context);//客户端主动断开一个连接
 		case SUBSCRIBE:
-			return mqtt3_handle_subscribe(db, context);
+			return mqtt3_handle_subscribe(db, context);//订阅一个topic
 		case UNSUBSCRIBE:
-			return mqtt3_handle_unsubscribe(db, context);
+			return mqtt3_handle_unsubscribe(db, context);//退订一个topic
 		default:
 			/* If we don't recognise the command, return an error straight away. */
 			return MOSQ_ERR_PROTOCOL;
@@ -101,7 +101,7 @@ int mqtt3_handle_publish(struct mosquitto_db *db, struct mosquitto *context)
 		_mosquitto_free(topic);
 		return 1;
 	}
-	if(_mosquitto_fix_sub_topic(&topic)){
+	if(_mosquitto_fix_sub_topic(&topic)){//去掉topic上面多余的斜杠
 		_mosquitto_free(topic);
 		return 1;
 	}
@@ -109,6 +109,7 @@ int mqtt3_handle_publish(struct mosquitto_db *db, struct mosquitto *context)
 		_mosquitto_free(topic);
 		return 1;
 	}
+	//检查topic中是否有通配符，不允许publish到通配符地址
 	if(_mosquitto_topic_wildcard_len_check(topic) != MOSQ_ERR_SUCCESS){
 		/* Invalid publish topic, just swallow it. */
 		_mosquitto_free(topic);
@@ -138,11 +139,12 @@ int mqtt3_handle_publish(struct mosquitto_db *db, struct mosquitto *context)
 		topic = topic_mount;
 	}
 
-	if(payloadlen){
+	if(payloadlen){//有数据部分，不是空,检查一下消息大小是否不合格，
 		if(db->config->message_size_limit && payloadlen > db->config->message_size_limit){
 			_mosquitto_log_printf(NULL, MOSQ_LOG_DEBUG, "Dropped too large PUBLISH from %s (d%d, q%d, r%d, m%d, '%s', ... (%ld bytes))", context->id, dup, qos, retain, mid, topic, (long)payloadlen);
 			goto process_bad_message;
 		}
+		//读消息体
 		payload = _mosquitto_calloc(payloadlen+1, sizeof(uint8_t));
 		if(_mosquitto_read_bytes(&context->in_packet, payload, payloadlen)){
 			_mosquitto_free(topic);
@@ -162,11 +164,11 @@ int mqtt3_handle_publish(struct mosquitto_db *db, struct mosquitto *context)
 	}
 
 	_mosquitto_log_printf(NULL, MOSQ_LOG_DEBUG, "Received PUBLISH from %s (d%d, q%d, r%d, m%d, '%s', ... (%ld bytes))", context->id, dup, qos, retain, mid, topic, (long)payloadlen);
-	if(qos > 0){
+	if(qos > 0){//检查这个用户是否曾经发过这条消息
 		mqtt3_db_message_store_find(context, mid, &stored);
 	}
 	if(!stored){
-		dup = 0;
+		dup = 0;//创建一个mosquitto_msg_store结构，放到db->msg_store的头部，结构里面存储了这条消息的所有信息
 		if(mqtt3_db_message_store(db, context->id, mid, topic, qos, payloadlen, payload, retain, &stored, 0)){
 			_mosquitto_free(topic);
 			if(payload) _mosquitto_free(payload);
@@ -181,6 +183,7 @@ int mqtt3_handle_publish(struct mosquitto_db *db, struct mosquitto *context)
 			break;
 		case 1:
 			if(mqtt3_db_messages_queue(db, context->id, topic, qos, retain, stored)) rc = 1;
+			//发送回包
 			if(_mosquitto_send_puback(context, mid)) rc = 1;
 			break;
 		case 2:

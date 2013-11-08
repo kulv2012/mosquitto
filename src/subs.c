@@ -152,7 +152,7 @@ static int _subs_process(struct mosquitto_db *db, struct _mosquitto_subhier *hie
 }
 
 static int _sub_topic_tokenise(const char *subtopic, struct _sub_token **topics)
-{
+{//将参数字符串subtopic进行按/分割的段解析，形成一个链表挂到参数topics上面
 	struct _sub_token *new_topic, *tail = NULL;
 	char *token;
 	char *local_subtopic = NULL;
@@ -180,7 +180,7 @@ static int _sub_topic_tokenise(const char *subtopic, struct _sub_token **topics)
 	}
 
 	token = strtok_r(local_subtopic, "/", &saveptr);
-	while(token){//一节一节的处理，形成一个链表
+	while(token){//一节一节的处理，形成一个链表,挂在参数topics上面，供上层使用
 		new_topic = _mosquitto_malloc(sizeof(struct _sub_token));
 		if(!new_topic) goto cleanup;
 		new_topic->next = NULL;
@@ -216,15 +216,16 @@ cleanup:
 }
 
 static int _sub_add(struct mosquitto_db *db, struct mosquitto *context, int qos, struct _mosquitto_subhier *subhier, struct _sub_token *tokens)
-{
+{//递归的查找参数tokens链表代表的路径段，找到其最终的订阅位置然后放到subs链表里面,返回MOSQ_ERR_SUCCESS表示成功，-1表示重复订阅
 	struct _mosquitto_subhier *branch, *last = NULL;
 	struct _mosquitto_subleaf *leaf, *last_leaf;
 
-	if(!tokens){
+	if(!tokens){//tokens为空，那么很简单了，只需要将这个订阅放到当前subhier->subs链表的后面就行了。
 		if(context){
-			leaf = subhier->subs;
+			leaf = subhier->subs;//遍历这个节点的叶子
 			last_leaf = NULL;
-			while(leaf){
+			while(leaf){//扫描一遍，看看是不是有重复订阅的情况，
+				//所以这里代价还是比较大的，如果有几千个人订阅这个节点，那么每次新订阅得扫描这么长
 				if(!strcmp(leaf->context->id, context->id)){
 					/* Client making a second subscription to same topic. Only
 					 * need to update QoS. Return -1 to indicate this to the
@@ -238,7 +239,7 @@ static int _sub_add(struct mosquitto_db *db, struct mosquitto *context, int qos,
 			leaf = _mosquitto_malloc(sizeof(struct _mosquitto_subleaf));
 			if(!leaf) return MOSQ_ERR_NOMEM;
 			leaf->next = NULL;
-			leaf->context = context;
+			leaf->context = context;//指向订阅的客户端，那么客户端断开了，这里还是订阅着的
 			leaf->qos = qos;
 			if(last_leaf){
 				last_leaf->next = leaf;
@@ -253,14 +254,15 @@ static int _sub_add(struct mosquitto_db *db, struct mosquitto *context, int qos,
 	}
 
 	branch = subhier->children;
-	while(branch){
+	while(branch){//扫描一遍当前这个节点的子分支的topic段名称是否相等，相等的话就订阅到其下面，否则需要在末尾增加一个分支
 		if(!strcmp(branch->topic, tokens->topic)){
+			//找到，递归调用
 			return _sub_add(db, context, qos, branch, tokens->next);
 		}
 		last = branch;
 		branch = branch->next;
 	}
-	/* Not found */
+	//没有找到，那么是一个新的分支，需要新建一个分支，挂入当前的层级的下面作为链表最后一个元素
 	branch = _mosquitto_calloc(1, sizeof(struct _mosquitto_subhier));
 	if(!branch) return MOSQ_ERR_NOMEM;
 	branch->topic = _mosquitto_strdup(tokens->topic);
@@ -270,6 +272,7 @@ static int _sub_add(struct mosquitto_db *db, struct mosquitto *context, int qos,
 	}else{
 		last->next = branch;
 	}
+	//新建了一个节点，然后继续往下深入，每一个段一级
 	return _sub_add(db, context, qos, branch, tokens->next);
 }
 
@@ -358,7 +361,7 @@ static int _sub_search(struct mosquitto_db *db, struct _mosquitto_subhier *subhi
 }
 
 int mqtt3_sub_add(struct mosquitto_db *db, struct mosquitto *context, const char *sub, int qos, struct _mosquitto_subhier *root)
-{
+{//将一个订阅的topic加入到root参数，也就是订阅树&db->subs上面,这里需要区分$SYS还是正常的客户端订阅
 	int tree;
 	int rc = 0;
 	struct _mosquitto_subhier *subhier;
@@ -374,22 +377,25 @@ int mqtt3_sub_add(struct mosquitto_db *db, struct mosquitto *context, const char
 	}else{
 		tree = 0;
 		if(strlen(sub) == 0) return MOSQ_ERR_SUCCESS;
+		//对/分割的段进行解析，形成链表放到tokens上面
 		if(_sub_topic_tokenise(sub, &tokens)) return 1;
 	}
 
-	subhier = root->children;
+	subhier = root->children;//mqtt3_db_open初始化的时候分配了2个节点，一个数据节点和$SYS系统数据节点
 	while(subhier){
 		if(!strcmp(subhier->topic, "") && tree == 0){
+			//正常的数据节点，mqtt3_db_open的时候初始化的
 			rc = _sub_add(db, context, qos, subhier, tokens);
 			break;
 		}else if(!strcmp(subhier->topic, "$SYS") && tree == 2){
+			//tree=2，那么只能订阅到$SYS的下面
 			rc = _sub_add(db, context, qos, subhier, tokens);
 			break;
 		}
 		subhier = subhier->next;
 	}
 
-	while(tokens){
+	while(tokens){//释放内存_sub_topic_tokenise
 		tail = tokens->next;
 		_mosquitto_free(tokens->topic);
 		_mosquitto_free(tokens);
@@ -401,7 +407,7 @@ int mqtt3_sub_add(struct mosquitto_db *db, struct mosquitto *context, const char
 }
 
 int mqtt3_sub_remove(struct mosquitto_db *db, struct mosquitto *context, const char *sub, struct _mosquitto_subhier *root)
-{
+{//跟mqtt3_sub_add类似
 	int rc = 0;
 	int tree;
 	struct _mosquitto_subhier *subhier;
@@ -441,7 +447,7 @@ int mqtt3_sub_remove(struct mosquitto_db *db, struct mosquitto *context, const c
 }
 
 int mqtt3_db_messages_queue(struct mosquitto_db *db, const char *source_id, const char *topic, int qos, int retain, struct mosquitto_msg_store *stored)
-{
+{//将参数代表的消息发布
 	int rc = 0;
 	int tree;
 	struct _mosquitto_subhier *subhier;
@@ -596,7 +602,7 @@ void mqtt3_sub_tree_print(struct _mosquitto_subhier *root, int level)
 }
 
 static int _retain_process(struct mosquitto_db *db, struct mosquitto_msg_store *retained, struct mosquitto *context, const char *sub, int sub_qos)
-{
+{//检查权限，生成messageid, 放入context->msg排队处理消息链表尾部,等待处理
 	int rc = 0;
 	int qos;
 	uint16_t mid;
@@ -616,11 +622,13 @@ static int _retain_process(struct mosquitto_db *db, struct mosquitto_msg_store *
 	}else{
 		mid = 0;
 	}
+	//将一条消息插入到context->msg链表后面，设置相关的状态。然后记录这条消息给哪些人发送过等
 	return mqtt3_db_message_insert(db, context, mid, mosq_md_out, qos, true, retained);
 }
 
 static int _retain_search(struct mosquitto_db *db, struct _mosquitto_subhier *subhier, struct _sub_token *tokens, struct mosquitto *context, const char *sub, int sub_qos, int level)
-{
+{//搜索订阅树，看看有没有retained消息，如果有，调用_retain_process，这里处理了通配符。
+	//#统配任意多级路径，+通配一级路径
 	struct _mosquitto_subhier *branch;
 	int flag = 0;
 
@@ -629,31 +637,34 @@ static int _retain_search(struct mosquitto_db *db, struct _mosquitto_subhier *su
 		/* Subscriptions with wildcards in aren't really valid topics to publish to
 		 * so they can't have retained messages.
 		 */
-		if(!strcmp(tokens->topic, "#") && !tokens->next){
+		if(!strcmp(tokens->topic, "#") && !tokens->next){//当前节点是#通配符，并且tokens段是最后一段了，那么匹配
 			/* Set flag to indicate that we should check for retained messages
 			 * on "foo" when we are subscribing to e.g. "foo/#" and then exit
 			 * this function and return to an earlier _retain_search().
 			 */
 			flag = -1;
-			if(branch->retained){
+			if(branch->retained){//#通配符，所以当前的节点是满足的
 				_retain_process(db, branch->retained, context, sub, sub_qos);
 			}
-			if(branch->children){
+			if(branch->children){//同时后面的所有节点都可以满足，因为tokens还是为#
 				_retain_search(db, branch, tokens, context, sub, sub_qos, level+1);
 			}
 		}else if(strcmp(branch->topic, "+") && (!strcmp(branch->topic, tokens->topic) || !strcmp(tokens->topic, "+"))){
-			if(tokens->next){
+			//1.字符正好相等，或者遇到+号通配1段
+			if(tokens->next){//还有下一级，那么往下一级匹配。
 				if(_retain_search(db, branch, tokens->next, context, sub, sub_qos, level+1) == -1){
-					if(branch->retained){
+					if(branch->retained){//上面返回-1，所以这里还需要将当前的节点上的订阅发布一下。但不需要再往上回溯了，因为这里是+
 						_retain_process(db, branch->retained, context, sub, sub_qos);
 					}
 				}
-			}else{
+			}else{//最后一级了，直接处理结果
 				if(branch->retained){
 					_retain_process(db, branch->retained, context, sub, sub_qos);
 				}
 			}
+			//比如有这样的 ：a/b/#
 			if(!branch->next && tokens->next && !strcmp(tokens->next->topic, "#") && level>0){
+				//如果该分支到末尾了并且tokens还没结束，其下一个节点竟然是#，那么，还可以处理一下。那么问题是，这里会不会多次发布了。
 				if(branch->retained){
 					_retain_process(db, branch->retained, context, sub, sub_qos);
 				}
@@ -666,7 +677,7 @@ static int _retain_search(struct mosquitto_db *db, struct _mosquitto_subhier *su
 }
 
 int mqtt3_retain_queue(struct mosquitto_db *db, struct mosquitto *context, const char *sub, int sub_qos)
-{
+{//处理一下那些retain遗留保存的数据，如果是新连接，得考虑给他发送这条消息.首先得找到他所对应的订阅树节点,检查节点上是否有数据
 	int tree;
 	struct _mosquitto_subhier *subhier;
 	struct _sub_token *tokens = NULL, *tail;
@@ -684,7 +695,7 @@ int mqtt3_retain_queue(struct mosquitto_db *db, struct mosquitto *context, const
 	}
 
 	subhier = db->subs.children;
-	while(subhier){
+	while(subhier){//根据topic，找到其所合适的节点，然后看看有没有retain数据，如果有就放入该连接的context->msg待发数据队列里面
 		if(!strcmp(subhier->topic, "") && tree == 0){
 			_retain_search(db, subhier, tokens, context, sub, sub_qos, 0);
 			break;
@@ -694,7 +705,7 @@ int mqtt3_retain_queue(struct mosquitto_db *db, struct mosquitto *context, const
 		}
 		subhier = subhier->next;
 	}
-	while(tokens){
+	while(tokens){//释放节点内存
 		tail = tokens->next;
 		_mosquitto_free(tokens->topic);
 		_mosquitto_free(tokens);

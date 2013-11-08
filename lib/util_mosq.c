@@ -137,7 +137,7 @@ void _mosquitto_check_keepalive(struct mosquitto *mosq)
  * into some/over/slashed/topic/etc/etc
  */
 int _mosquitto_fix_sub_topic(char **subtopic)
-{
+{//去掉topic上面多余的斜杠等。
 	char *fixed = NULL;
 	char *token;
 	char *saveptr = NULL;
@@ -182,7 +182,7 @@ uint16_t _mosquitto_mid_generate(struct mosquitto *mosq)
  * Returns MOSQ_ERR_SUCCESS if everything is fine.
  */
 int _mosquitto_topic_wildcard_len_check(const char *str)
-{
+{//不允许publish到通配符地址
 	int len = 0;
 	while(str && str[0]){
 		if(str[0] == '+' || str[0] == '#'){

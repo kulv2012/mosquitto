@@ -447,14 +447,16 @@ int mqtt3_handle_subscribe(struct mosquitto_db *db, struct mosquitto *context)
 			}
 			_mosquitto_log_printf(NULL, MOSQ_LOG_DEBUG, "\t%s (QoS %d)", sub, qos);
 
+			//将当前的这个topic挂到订阅树里面，树的每一层为路径的一段,树的subs代表订阅的客户端链表，children代表子分支链表
 			rc2 = mqtt3_sub_add(db, context, sub, qos, &db->subs);
-			if(rc2 == MOSQ_ERR_SUCCESS){
+			if(rc2 == MOSQ_ERR_SUCCESS){//订阅成功了
+				//下面需要检查一下这个topic上面是不是有retain保留消息需要发送给这个客户端,里面又会处理一遍订阅树，其实可以合并一起处理嘛
 				if(mqtt3_retain_queue(db, context, sub, qos)) rc = 1;
 			}else if(rc2 != -1){
 				rc = rc2;
 			}
 			_mosquitto_log_printf(NULL, MOSQ_LOG_SUBSCRIBE, "%s %d %s", context->id, qos, sub);
-			_mosquitto_free(sub);
+			_mosquitto_free(sub);//释放这个原始的字符串a/b/c
 
 			tmp_payload = _mosquitto_realloc(payload, payloadlen + 1);
 			if(tmp_payload){//这是要返回给客户端的QOS列表,一一对应
@@ -466,9 +468,11 @@ int mqtt3_handle_subscribe(struct mosquitto_db *db, struct mosquitto *context)
 
 				return MOSQ_ERR_NOMEM;
 			}
+			//搞定一条订阅消息，在订阅的topic上已经记录了这个连接，并且payload[]上面也增加了对应连接的qos准备返回
 		}
 	}
 
+	//发送SUBACK回包
 	if(_mosquitto_send_suback(context, mid, payloadlen, payload)) rc = 1;
 	_mosquitto_free(payload);
 	
@@ -480,7 +484,7 @@ int mqtt3_handle_subscribe(struct mosquitto_db *db, struct mosquitto *context)
 }
 
 int mqtt3_handle_unsubscribe(struct mosquitto_db *db, struct mosquitto *context)
-{
+{// 一条条topic的从订阅树中移除当前连接,然后立即给客户端回包
 	uint16_t mid;
 	char *sub;
 
@@ -497,6 +501,7 @@ int mqtt3_handle_unsubscribe(struct mosquitto_db *db, struct mosquitto *context)
 
 		if(sub){
 			_mosquitto_log_printf(NULL, MOSQ_LOG_DEBUG, "\t%s", sub);
+			//从订阅树种移除掉这个订阅
 			mqtt3_sub_remove(db, context, sub, &db->subs);
 			_mosquitto_log_printf(NULL, MOSQ_LOG_UNSUBSCRIBE, "%s %s", context->id, sub);
 			_mosquitto_free(sub);

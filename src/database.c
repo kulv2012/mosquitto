@@ -63,13 +63,14 @@ int mqtt3_db_open(struct mqtt3_config *config, struct mosquitto_db *db)
 	db->subs.subs = NULL;
 	db->subs.topic = "";
 
+	//新建第一个数据订阅节点
 	child = _mosquitto_malloc(sizeof(struct _mosquitto_subhier));
 	if(!child){
 		_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Out of memory.");
 		return MOSQ_ERR_NOMEM;
 	}
 	child->next = NULL;
-	child->topic = _mosquitto_strdup("");
+	child->topic = _mosquitto_strdup("");//默认的节点,正常订阅等用
 	if(!child->topic){
 		_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Out of memory.");
 		return MOSQ_ERR_NOMEM;
@@ -79,6 +80,7 @@ int mqtt3_db_open(struct mqtt3_config *config, struct mosquitto_db *db)
 	child->retained = NULL;
 	db->subs.children = child;
 
+	//创建$SYS系统状态订阅节点
 	child = _mosquitto_malloc(sizeof(struct _mosquitto_subhier));
 	if(!child){
 		_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Out of memory.");
@@ -93,7 +95,7 @@ int mqtt3_db_open(struct mqtt3_config *config, struct mosquitto_db *db)
 	child->subs = NULL;
 	child->children = NULL;
 	child->retained = NULL;
-	db->subs.children->next = child;
+	db->subs.children->next = child;//该链表第一个节点为正常的topic订阅节点，第二个为$SYS系统状态订阅节点
 
 	db->unpwd = NULL;
 
@@ -223,7 +225,7 @@ int mqtt3_db_message_delete(struct mosquitto *context, uint16_t mid, enum mosqui
 }
 
 int mqtt3_db_message_insert(struct mosquitto_db *db, struct mosquitto *context, uint16_t mid, enum mosquitto_msg_direction dir, int qos, bool retain, struct mosquitto_msg_store *stored)
-{
+{//将一条消息插入到context->msg链表后面，设置相关的状态。然后记录这条消息给哪些人发送过等
 	struct mosquitto_client_msg *msg, *tail = NULL;
 	enum mosquitto_msg_state state = mosq_ms_invalid;
 	int msg_count = 0;
@@ -241,9 +243,10 @@ int mqtt3_db_message_insert(struct mosquitto_db *db, struct mosquitto *context, 
 	 * multiple times for overlapping subscriptions, although this is only the
 	 * case for SUBSCRIPTION with multiple subs in so is a minor concern.
 	 */
+	//上面说了，retain消息可能会因为2条topic重叠了，导致收到了多份。不过问题不大
 	if(db->config->allow_duplicate_messages == false
 			&& dir == mosq_md_out && retain == false && stored->dest_ids){
-
+		//非retain遗留消息的情况下，检查一下这条消息是否曾经送达过。如果送达过，那就不用发了
 		for(i=0; i<stored->dest_id_count; i++){
 			if(!strcmp(stored->dest_ids[i], context->id)){
 				/* We have already sent this message to this client. */
@@ -251,9 +254,9 @@ int mqtt3_db_message_insert(struct mosquitto_db *db, struct mosquitto *context, 
 			}
 		}
 	}
-	if(context->sock == INVALID_SOCKET){
+	if(context->sock == INVALID_SOCKET){//该客户端不在线
 		/* Client is not connected only queue messages with QoS>0. */
-		if(qos == 0 && !db->config->queue_qos0_messages){
+		if(qos == 0 && !db->config->queue_qos0_messages){//如果不保存QOS0的消息，并且不是bridge，那么可以直接返回了，因为客户端不在线
 			if(!context->bridge){
 				return 2;
 			}else{
@@ -265,7 +268,7 @@ int mqtt3_db_message_insert(struct mosquitto_db *db, struct mosquitto *context, 
 	}
 	if(context->msgs){
 		tail = context->msgs;
-		msg_count = 1;
+		msg_count = 1;//统计一下这个客户端的qos>0的消息总数，看看是否超过配置了
 		while(tail && tail->next){
 			if(tail->qos > 0){
 				msg_count++;
@@ -275,6 +278,7 @@ int mqtt3_db_message_insert(struct mosquitto_db *db, struct mosquitto *context, 
 	}
 
 	if(context->sock != INVALID_SOCKET){
+		//连接有效，那么如果总排队消息等没超过限制的话，那么根据qos级别，输入还是输出，设置其对应的state状态
 		if(qos == 0 || max_inflight == 0 || msg_count < max_inflight){
 			if(dir == mosq_md_out){
 				switch(qos){
@@ -307,6 +311,7 @@ int mqtt3_db_message_insert(struct mosquitto_db *db, struct mosquitto *context, 
 			return 2;
 		}
 	}else{
+		//这个连接已经关闭了，所以只能将其排队了
 		if(max_queued > 0 && msg_count >= max_queued){
 #ifdef WITH_SYS_TREE
 			g_msgs_dropped++;
@@ -324,10 +329,11 @@ int mqtt3_db_message_insert(struct mosquitto_db *db, struct mosquitto *context, 
 	}
 #endif
 
+	//申请一个客户端消息结构，挂载在context->msgs链表上面
 	msg = _mosquitto_malloc(sizeof(struct mosquitto_client_msg));
 	if(!msg) return MOSQ_ERR_NOMEM;
 	msg->next = NULL;
-	msg->store = stored;
+	msg->store = stored;//指向这条消息的综合结构
 	msg->store->ref_count++;
 	msg->mid = mid;
 	msg->timestamp = mosquitto_time();
@@ -335,13 +341,14 @@ int mqtt3_db_message_insert(struct mosquitto_db *db, struct mosquitto *context, 
 	msg->state = state;
 	msg->dup = false;
 	msg->qos = qos;
-	msg->retain = retain;
+	msg->retain = retain;//是否是遗留消息
 	if(tail){
 		tail->next = msg;
 	}else{
 		context->msgs = msg;
 	}
 
+	//看看是否需要记录这条消息发给过哪些人，避免重复发送，比如重练的时候可能重复发送
 	if(db->config->allow_duplicate_messages == false && dir == mosq_md_out && retain == false){
 		/* Record which client ids this message has been sent to so we can avoid duplicates.
 		 * Outgoing messages only.
@@ -421,7 +428,7 @@ int mqtt3_db_messages_easy_queue(struct mosquitto_db *db, struct mosquitto *cont
 }
 
 int mqtt3_db_message_store(struct mosquitto_db *db, const char *source, uint16_t source_mid, const char *topic, int qos, uint32_t payloadlen, const void *payload, int retain, struct mosquitto_msg_store **stored, dbid_t store_id)
-{
+{//创建一个mosquitto_msg_store结构，放到db->msg_store的头部，结构里面存储了这条消息的所有信息,用来共享
 	struct mosquitto_msg_store *temp;
 
 	assert(db);
@@ -446,7 +453,7 @@ int mqtt3_db_message_store(struct mosquitto_db *db, const char *source, uint16_t
 	temp->msg.mid = 0;
 	temp->msg.qos = qos;
 	temp->msg.retain = retain;
-	if(topic){
+	if(topic){//这条消息是给这个topic用的
 		temp->msg.topic = _mosquitto_strdup(topic);
 		if(!temp->msg.topic){
 			_mosquitto_free(temp->source_id);
@@ -458,7 +465,7 @@ int mqtt3_db_message_store(struct mosquitto_db *db, const char *source, uint16_t
 		temp->msg.topic = NULL;
 	}
 	temp->msg.payloadlen = payloadlen;
-	if(payloadlen){
+	if(payloadlen){//拷贝消息体,注意异常的刷花内存释放
 		temp->msg.payload = _mosquitto_malloc(sizeof(char)*payloadlen);
 		if(!temp->msg.payload){
 			if(temp->source_id) _mosquitto_free(temp->source_id);
@@ -479,10 +486,10 @@ int mqtt3_db_message_store(struct mosquitto_db *db, const char *source, uint16_t
 		_mosquitto_free(temp);
 		return 1;
 	}
-	temp->dest_ids = NULL;
+	temp->dest_ids = NULL;//目前还没有发送给任何人
 	temp->dest_id_count = 0;
 	db->msg_store_count++;
-	db->msg_store = temp;
+	db->msg_store = temp;//挂入db->msg_store头部
 	(*stored) = temp;
 
 	if(!store_id){
@@ -495,7 +502,7 @@ int mqtt3_db_message_store(struct mosquitto_db *db, const char *source, uint16_t
 }
 
 int mqtt3_db_message_store_find(struct mosquitto *context, uint16_t mid, struct mosquitto_msg_store **stored)
-{
+{//检查一下这个用户是不是曾经发过这条mid的消息，如果是，应该复用
 	struct mosquitto_client_msg *tail;
 
 	if(!context) return MOSQ_ERR_INVAL;
@@ -720,7 +727,7 @@ int mqtt3_db_message_release(struct mosquitto_db *db, struct mosquitto *context,
 }
 
 int mqtt3_db_message_write(struct mosquitto *context)
-{
+{//将context->msgs上还在排队的不同状态的数据包，进行处理，放入context->out_packet待发数据队列的尾部，并触发写操作发送
 	int rc;
 	struct mosquitto_client_msg *tail, *last = NULL;
 	uint16_t mid;
@@ -753,6 +760,7 @@ int mqtt3_db_message_write(struct mosquitto *context)
 
 			switch(tail->state){
 				case mosq_ms_publish_qos0:
+					//放入待发数据队列
 					rc = _mosquitto_send_publish(context, mid, topic, payloadlen, payload, qos, retain, retries);
 					if(!rc){
 						if(last){

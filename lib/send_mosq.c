@@ -122,6 +122,7 @@ int _mosquitto_send_publish(struct mosquitto *mosq, uint16_t mid, const char *to
 	_mosquitto_log_printf(mosq, MOSQ_LOG_DEBUG, "Client %s sending PUBLISH (d%d, q%d, r%d, m%d, '%s', ... (%ld bytes))", mosq->id, dup, qos, retain, mid, topic, (long)payloadlen);
 #endif
 
+	//组包，然后放入待发数据队列，等待发送
 	return _mosquitto_send_real_publish(mosq, mid, topic, payloadlen, payload, qos, retain, dup);
 }
 
@@ -195,7 +196,7 @@ int _mosquitto_send_simple_command(struct mosquitto *mosq, uint8_t command)
 }
 
 int _mosquitto_send_real_publish(struct mosquitto *mosq, uint16_t mid, const char *topic, uint32_t payloadlen, const void *payload, int qos, bool retain, bool dup)
-{
+{//根据参数，组成一个packet包，将其数据调用_mosquitto_packet_queue挂入待发数据队列里面
 	struct _mosquitto_packet *packet = NULL;
 	int packetlen;
 	int rc;
@@ -227,5 +228,6 @@ int _mosquitto_send_real_publish(struct mosquitto *mosq, uint16_t mid, const cha
 		_mosquitto_write_bytes(packet, payload, payloadlen);
 	}
 
+	//将packet参数指向的包放入mosq->out_packet链表的尾部，并顺带触发一次数据发送
 	return _mosquitto_packet_queue(mosq, packet);
 }
