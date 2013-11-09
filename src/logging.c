@@ -32,7 +32,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <syslog.h>
 
 #ifndef CMAKE
-#include <config.h>
 #endif
 
 #include <mosquitto_broker.h>

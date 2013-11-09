@@ -30,7 +30,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #ifndef _MOSQUITTO_INTERNAL_H_
 #define _MOSQUITTO_INTERNAL_H_
 
-#include "config.h"
 
 
 #include <stdlib.h>

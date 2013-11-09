@@ -29,7 +29,6 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include <assert.h>
 
-#include <config.h>
 
 #include <mosquitto_broker.h>
 #include <memory_mosq.h>

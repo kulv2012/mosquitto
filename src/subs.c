@@ -58,7 +58,6 @@ POSSIBILITY OF SUCH DAMAGE.
  *	a/b/d
  */
 
-#include <config.h>
 
 #include <assert.h>
 #include <stdio.h>

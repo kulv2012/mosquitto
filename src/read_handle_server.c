@@ -30,7 +30,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <stdio.h>
 #include <string.h>
 
-#include <config.h>
 
 #include <mosquitto_broker.h>
 #include <mqtt3_protocol.h>

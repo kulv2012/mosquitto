@@ -30,7 +30,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #ifndef MQTT3_H
 #define MQTT3_H
 
-#include <config.h>
 #include <stdio.h>
 
 #include <mosquitto_internal.h>

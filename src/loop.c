@@ -29,7 +29,6 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #define _GNU_SOURCE
 
-#include <config.h>
 
 #include <assert.h>
 #include <poll.h>
