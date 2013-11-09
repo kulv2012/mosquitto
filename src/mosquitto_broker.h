@@ -59,7 +59,7 @@ struct _mqtt3_listener {
 	char *host;
 	uint16_t port;
 	int max_connections;
-	car *mount_point;//配置项，代表本broker里面的所有topic的前缀。注意跟其他客户端是不可见的。
+	char *mount_point;//配置项，代表本broker里面的所有topic的前缀。注意跟其他客户端是不可见的。
 	int *socks;//由于可能hostname为域名等，一条listener可能需要花费多个sock套接字句柄，所以为数组.所有的sock放在main()的局部变量listensock上面
 	int sock_count;//上面socks数组的个数
 	int client_count;//这个listener上面的客户连接数目
@@ -96,7 +96,7 @@ struct mqtt3_config {
 	int retry_interval;
 	int store_clean_interval;
 	int sys_interval;
-	bool upgrade_outgoing_qos;
+	bool upgrade_outgoing_qos;//是否允许强制上升QOS，比如客户端要求2，但publisher只要求0，那么如果配置为true，最终以2发送
 	char *user;
 	bool verbose;
 	char *auth_plugin;
@@ -116,13 +116,13 @@ struct _mosquitto_subhier {
 	struct _mosquitto_subhier *next;
 	struct _mosquitto_subleaf *subs;//一个节点上订阅的客户端链表
 	char *topic;
-	struct mosquitto_msg_store *retained;
+	struct mosquitto_msg_store *retained;//指向db->msg_store上的一条消息，在指向的时候增加了count计数的，所以不会丢掉
 };
 
 struct mosquitto_msg_store{//这是服务端记录的消息结构
 	struct mosquitto_msg_store *next;
 	dbid_t db_id;
-	int ref_count;//被多少mosquitto_client_msg客户端消息引用了
+	int ref_count;//被多少mosquitto_client_msg客户端消息引用了,如果为0，就可以删除这条消息了
 	char *source_id;
 	char **dest_ids;//这条消息已经送达的id列表，配置allow_duplicate_messages了的话，这里就有用了
 	int dest_id_count;

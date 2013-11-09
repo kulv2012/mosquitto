@@ -366,7 +366,7 @@ address	./lib/mosquitto_internal.h	/^	char *address;$/;"	m	struct:mosquitto
 address	./src/mosquitto_broker.h	/^	char *address;$/;"	m	struct:bridge_address
 address_count	./src/mosquitto_broker.h	/^	int address_count;$/;"	m	struct:_mqtt3_bridge
 addresses	./src/mosquitto_broker.h	/^	struct bridge_address *addresses;$/;"	m	struct:_mqtt3_bridge	typeref:struct:_mqtt3_bridge::bridge_address
-allow_anonymous	./src/mosquitto_broker.h	/^	bool allow_anonymous;$/;"	m	struct:mqtt3_config
+allow_anonymous	./src/mosquitto_broker.h	/^	bool allow_anonymous;\/\/是否允许免密码登陆使用$/;"	m	struct:mqtt3_config
 allow_duplicate_messages	./src/mosquitto_broker.h	/^	bool allow_duplicate_messages;$/;"	m	struct:mqtt3_config
 auth_option_count	./src/mosquitto_broker.h	/^	int auth_option_count;$/;"	m	struct:mqtt3_config
 auth_options	./src/mosquitto_broker.h	/^	struct mosquitto_auth_opt *auth_options;$/;"	m	struct:mqtt3_config	typeref:struct:mqtt3_config::mosquitto_auth_opt
@@ -392,14 +392,14 @@ buckets	./src/uthash.h	/^   UT_hash_bucket *buckets;$/;"	m	struct:UT_hash_table
 calc_load	./src/sys_tree.c	/^static void calc_load(struct mosquitto_db *db, char *buf, const char *topic, double exponent, double interval, double *current)$/;"	f	file:
 callback_mutex	./lib/mosquitto_internal.h	/^	pthread_mutex_t callback_mutex;$/;"	m	struct:mosquitto
 child	./src/mosquitto_broker.h	/^	struct _mosquitto_acl *child;$/;"	m	struct:_mosquitto_acl	typeref:struct:_mosquitto_acl::_mosquitto_acl
-children	./src/mosquitto_broker.h	/^	struct _mosquitto_subhier *children;$/;"	m	struct:_mosquitto_subhier	typeref:struct:_mosquitto_subhier::_mosquitto_subhier
+children	./src/mosquitto_broker.h	/^	struct _mosquitto_subhier *children;\/\/这个节点的下一级节点链表$/;"	m	struct:_mosquitto_subhier	typeref:struct:_mosquitto_subhier::_mosquitto_subhier
 clean_session	./lib/mosquitto_internal.h	/^	bool clean_session;$/;"	m	struct:mosquitto
 clean_session	./src/mosquitto_broker.h	/^	bool clean_session;$/;"	m	struct:_mqtt3_bridge
 client_count	./src/mosquitto_broker.h	/^	int client_count;\/\/这个listener上面的客户连接数目$/;"	m	struct:_mqtt3_listener
 clientid	./src/mosquitto_broker.h	/^	char *clientid;$/;"	m	struct:_mqtt3_bridge
-clientid_index_hash	./src/mosquitto_broker.h	/^	struct _clientid_index_hash *clientid_index_hash;$/;"	m	struct:mosquitto_db	typeref:struct:mosquitto_db::_clientid_index_hash
+clientid_index_hash	./src/mosquitto_broker.h	/^	struct _clientid_index_hash *clientid_index_hash;\/\/所有客户端id的哈希表,用来快速找到这个客户端在db->contexts数组中的位置的$/;"	m	struct:mosquitto_db	typeref:struct:mosquitto_db::_clientid_index_hash
 clientid_prefixes	./src/mosquitto_broker.h	/^	char *clientid_prefixes;$/;"	m	struct:mqtt3_config
-command	./lib/mosquitto_internal.h	/^	uint8_t command;$/;"	m	struct:_mosquitto_packet
+command	./lib/mosquitto_internal.h	/^	uint8_t command;\/\/4 Message Type|1 DUP flag|2 QoS level|1 RETAIN$/;"	m	struct:_mosquitto_packet
 complete	./test/qos.c	/^	bool complete;$/;"	m	struct:sub	file:
 config	./src/mosquitto_broker.h	/^	struct mqtt3_config *config;$/;"	m	struct:mosquitto_db	typeref:struct:mosquitto_db::mqtt3_config
 config_file	./src/mosquitto_broker.h	/^	char *config_file;$/;"	m	struct:mqtt3_config
@@ -407,7 +407,7 @@ config_recurse	./src/conf.c	/^struct config_recurse {$/;"	s	file:
 connect_callback	./examples/mysql_log/mysql_log.c	/^void connect_callback(struct mosquitto *mosq, void *obj, int result)$/;"	f
 connected	./client/pub_client.c	/^static bool connected = true;$/;"	v	file:
 connection_messages	./src/mosquitto_broker.h	/^	bool connection_messages;$/;"	m	struct:mqtt3_config
-context	./src/mosquitto_broker.h	/^	struct mosquitto *context;$/;"	m	struct:_mosquitto_subleaf	typeref:struct:_mosquitto_subleaf::mosquitto
+context	./src/mosquitto_broker.h	/^	struct mosquitto *context;\/\/指向订阅的客户端连接，$/;"	m	struct:_mosquitto_subleaf	typeref:struct:_mosquitto_subleaf::mosquitto
 context_count	./src/mosquitto_broker.h	/^	int context_count;$/;"	m	struct:mosquitto_db
 contexts	./src/mosquitto_broker.h	/^	struct mosquitto **contexts;\/\/注意这个地方会不断变化，所以不要指向这个数组$/;"	m	struct:mosquitto_db	typeref:struct:mosquitto_db::mosquitto
 copy_contents	./src/mosquitto_passwd.c	/^int copy_contents(FILE *src, FILE *dest)$/;"	f
@@ -433,7 +433,7 @@ dbid_t	./src/mosquitto_broker.h	/^typedef uint64_t dbid_t;$/;"	t
 default_listener	./src/mosquitto_broker.h	/^	struct _mqtt3_listener default_listener;$/;"	m	struct:mqtt3_config	typeref:struct:mqtt3_config::_mqtt3_listener
 delete_pwuser	./src/mosquitto_passwd.c	/^int delete_pwuser(FILE *fptr, FILE *ftmp, const char *username)$/;"	f
 dest_id_count	./src/mosquitto_broker.h	/^	int dest_id_count;$/;"	m	struct:mosquitto_msg_store
-dest_ids	./src/mosquitto_broker.h	/^	char **dest_ids;$/;"	m	struct:mosquitto_msg_store
+dest_ids	./src/mosquitto_broker.h	/^	char **dest_ids;\/\/这条消息已经送达的id列表，配置allow_duplicate_messages了的话，这里就有用了$/;"	m	struct:mosquitto_msg_store
 direction	./lib/mosquitto_internal.h	/^	enum mosquitto_msg_direction direction;$/;"	m	struct:mosquitto_message_all	typeref:enum:mosquitto_message_all::mosquitto_msg_direction
 direction	./src/mosquitto_broker.h	/^	enum mosquitto_msg_direction direction;$/;"	m	struct:mosquitto_client_msg	typeref:enum:mosquitto_client_msg::mosquitto_msg_direction
 direction	./src/mosquitto_broker.h	/^	enum mqtt3_bridge_direction direction;$/;"	m	struct:_mqtt3_bridge_topic	typeref:enum:_mqtt3_bridge_topic::mqtt3_bridge_direction
@@ -485,7 +485,7 @@ hh_prev	./src/uthash.h	/^   struct UT_hash_handle *hh_prev;   \/* previous hh in
 hho	./src/uthash.h	/^   ptrdiff_t hho; \/* hash handle offset (byte pos of hash handle in element *\/$/;"	m	struct:UT_hash_table
 host	./lib/mosquitto_internal.h	/^	char *host;$/;"	m	struct:mosquitto
 host	./src/mosquitto_broker.h	/^	char *host;$/;"	m	struct:_mqtt3_listener
-id	./lib/mosquitto_internal.h	/^	char *id;$/;"	m	struct:mosquitto
+id	./lib/mosquitto_internal.h	/^	char *id;\/\/客户端的id$/;"	m	struct:mosquitto
 id	./src/mosquitto_broker.h	/^	char *id;$/;"	m	struct:_clientid_index_hash
 ideal_chain_maxlen	./src/uthash.h	/^   unsigned ideal_chain_maxlen;$/;"	m	struct:UT_hash_table
 idle_timeout	./src/mosquitto_broker.h	/^	int idle_timeout;$/;"	m	struct:_mqtt3_bridge
@@ -495,12 +495,12 @@ ineff_expands	./src/uthash.h	/^   unsigned ineff_expands, noexpand;$/;"	m	struct
 inflight_messages	./lib/mosquitto_internal.h	/^	int inflight_messages;$/;"	m	struct:mosquitto
 int_db	./src/mosquitto.c	/^struct mosquitto_db int_db;$/;"	v	typeref:struct:mosquitto_db
 is_bridge	./lib/mosquitto_internal.h	/^	bool is_bridge;$/;"	m	struct:mosquitto
-keepalive	./lib/mosquitto_internal.h	/^	uint16_t keepalive;$/;"	m	struct:mosquitto
+keepalive	./lib/mosquitto_internal.h	/^	uint16_t keepalive;\/\/客户端发送过来的keepalive时间$/;"	m	struct:mosquitto
 keepalive	./src/mosquitto_broker.h	/^	int keepalive;$/;"	m	struct:_mqtt3_bridge
 key	./src/mosquitto_plugin.h	/^	char *key;$/;"	m	struct:mosquitto_auth_opt
 key	./src/uthash.h	/^   void *key;                        \/* ptr to enclosing struct's key  *\/$/;"	m	struct:UT_hash_handle
 keylen	./src/uthash.h	/^   unsigned keylen;                  \/* enclosing struct's key len     *\/$/;"	m	struct:UT_hash_handle
-last_db_id	./src/mosquitto_broker.h	/^	dbid_t last_db_id;$/;"	m	struct:mosquitto_db
+last_db_id	./src/mosquitto_broker.h	/^	dbid_t last_db_id;\/\/msg_store上的消息的顺序id$/;"	m	struct:mosquitto_db
 last_mid	./client/pub_client.c	/^static int last_mid = -1;$/;"	v	file:
 last_mid	./lib/mosquitto_internal.h	/^	uint16_t last_mid;$/;"	m	struct:mosquitto
 last_msg_in	./lib/mosquitto_internal.h	/^	time_t last_msg_in;$/;"	m	struct:mosquitto
@@ -509,7 +509,7 @@ last_retry_check	./lib/mosquitto_internal.h	/^	time_t last_retry_check;$/;"	m	st
 lazy_reconnect	./src/mosquitto_broker.h	/^	bool lazy_reconnect;$/;"	m	struct:_mqtt3_bridge
 lib	./src/mosquitto_broker.h	/^	void *lib;$/;"	m	struct:_mosquitto_auth_plugin
 libmosq_EXPORT	./lib/mosquitto.h	44;"	d
-listener	./lib/mosquitto_internal.h	/^	struct _mqtt3_listener *listener; \/\/直线我所属的listener的db->config->listeners[i]位置$/;"	m	struct:mosquitto	typeref:struct:mosquitto::_mqtt3_listener
+listener	./lib/mosquitto_internal.h	/^	struct _mqtt3_listener *listener; \/\/指向我所属的listener的db->config->listeners[i]位置$/;"	m	struct:mosquitto	typeref:struct:mosquitto::_mqtt3_listener
 listener_count	./src/mosquitto_broker.h	/^	int listener_count;$/;"	m	struct:mqtt3_config
 listeners	./src/mosquitto_broker.h	/^	struct _mqtt3_listener *listeners;$/;"	m	struct:mqtt3_config	typeref:struct:mqtt3_config::_mqtt3_listener
 load_file	./client/pub_client.c	/^int load_file(const char *filename)$/;"	f
@@ -636,7 +636,7 @@ mosquitto_auth_security_cleanup	./test/broker/c/auth_plugin.c	/^int mosquitto_au
 mosquitto_auth_security_init	./test/broker/c/auth_plugin.c	/^int mosquitto_auth_security_init(void *user_data, struct mosquitto_auth_opt *auth_opts, int auth_opt_count, bool reload)$/;"	f
 mosquitto_auth_unpwd_check	./test/broker/c/auth_plugin.c	/^int mosquitto_auth_unpwd_check(void *user_data, const char *username, const char *password)$/;"	f
 mosquitto_bridge_start_type	./src/mosquitto_broker.h	/^enum mosquitto_bridge_start_type{$/;"	g
-mosquitto_client_msg	./src/mosquitto_broker.h	/^struct mosquitto_client_msg{$/;"	s
+mosquitto_client_msg	./src/mosquitto_broker.h	/^struct mosquitto_client_msg{\/\/这是要发送给客户端的消息结构$/;"	s
 mosquitto_client_state	./lib/mosquitto_internal.h	/^enum mosquitto_client_state {$/;"	g
 mosquitto_connack_string	./lib/mosquitto.c	/^const char *mosquitto_connack_string(int connack_code)$/;"	f
 mosquitto_connect	./lib/mosquitto.c	/^int mosquitto_connect(struct mosquitto *mosq, const char *host, int port, int keepalive)$/;"	f
@@ -669,7 +669,7 @@ mosquitto_message_free	./lib/messages_mosq.c	/^void mosquitto_message_free(struc
 mosquitto_message_retry_set	./lib/messages_mosq.c	/^void mosquitto_message_retry_set(struct mosquitto *mosq, unsigned int message_retry)$/;"	f
 mosquitto_msg_direction	./lib/mosquitto_internal.h	/^enum mosquitto_msg_direction {$/;"	g
 mosquitto_msg_state	./lib/mosquitto_internal.h	/^enum mosquitto_msg_state {$/;"	g
-mosquitto_msg_store	./src/mosquitto_broker.h	/^struct mosquitto_msg_store{$/;"	s
+mosquitto_msg_store	./src/mosquitto_broker.h	/^struct mosquitto_msg_store{\/\/这是服务端记录的消息结构$/;"	s
 mosquitto_new	./lib/mosquitto.c	/^struct mosquitto *mosquitto_new(const char *id, bool clean_session, void *userdata)$/;"	f
 mosquitto_psk_key_get	./src/security.c	/^int mosquitto_psk_key_get(struct mosquitto_db *db, const char *hint, const char *identity, char *key, int max_key_len)$/;"	f
 mosquitto_psk_key_get_default	./src/security_default.c	/^int mosquitto_psk_key_get_default(struct mosquitto_db *db, const char *hint, const char *identity, char *key, int max_key_len)$/;"	f
@@ -709,7 +709,7 @@ mosquitto_want_write	./lib/mosquitto.c	/^bool mosquitto_want_write(struct mosqui
 mosquitto_will_clear	./lib/mosquitto.c	/^int mosquitto_will_clear(struct mosquitto *mosq)$/;"	f
 mosquitto_will_set	./lib/mosquitto.c	/^int mosquitto_will_set(struct mosquitto *mosq, const char *topic, int payloadlen, const void *payload, int qos, bool retain)$/;"	f
 mosquittopp	./lib/cpp/mosquittopp.h	/^class mosqpp_EXPORT mosquittopp {$/;"	c	namespace:mosqpp
-mount_point	./src/mosquitto_broker.h	/^	char *mount_point;$/;"	m	struct:_mqtt3_listener
+mount_point	./src/mosquitto_broker.h	/^	car *mount_point;\/\/配置项，代表本broker里面的所有topic的前缀。注意跟其他客户端是不可见的。$/;"	m	struct:_mqtt3_listener
 mqtt3_bridge_direction	./src/mosquitto_broker.h	/^enum mqtt3_bridge_direction{$/;"	g
 mqtt3_config	./src/mosquitto_broker.h	/^struct mqtt3_config {$/;"	s
 mqtt3_config_cleanup	./src/conf.c	/^void mqtt3_config_cleanup(struct mqtt3_config *config)$/;"	f
@@ -767,10 +767,10 @@ msg	./lib/mosquitto_internal.h	/^	struct mosquitto_message msg;$/;"	m	struct:mos
 msg	./src/mosquitto_broker.h	/^	struct mosquitto_message msg;$/;"	m	struct:mosquitto_msg_store	typeref:struct:mosquitto_msg_store::mosquitto_message
 msg	./test/qos.c	/^	struct mosquitto_message msg;$/;"	m	struct:msg_list	typeref:struct:msg_list::mosquitto_message	file:
 msg_list	./test/qos.c	/^struct msg_list{$/;"	s	file:
-msg_store	./src/mosquitto_broker.h	/^	struct mosquitto_msg_store *msg_store;$/;"	m	struct:mosquitto_db	typeref:struct:mosquitto_db::mosquitto_msg_store
+msg_store	./src/mosquitto_broker.h	/^	struct mosquitto_msg_store *msg_store;\/\/这里是所有publish的消息，都在这.新消息插入头部$/;"	m	struct:mosquitto_db	typeref:struct:mosquitto_db::mosquitto_msg_store
 msg_store_count	./src/mosquitto_broker.h	/^	int msg_store_count;$/;"	m	struct:mosquitto_db
 msglen	./client/pub_client.c	/^static long msglen = 0;$/;"	v	file:
-msgs	./lib/mosquitto_internal.h	/^	struct mosquitto_client_msg *msgs;$/;"	m	struct:mosquitto	typeref:struct:mosquitto::mosquitto_client_msg
+msgs	./lib/mosquitto_internal.h	/^	struct mosquitto_client_msg *msgs;\/\/这个连接的消息链表,新的放在后面$/;"	m	struct:mosquitto	typeref:struct:mosquitto::mosquitto_client_msg
 msgtime_mutex	./lib/mosquitto_internal.h	/^	pthread_mutex_t msgtime_mutex;$/;"	m	struct:mosquitto
 my_connect_callback	./client/pub_client.c	/^void my_connect_callback(struct mosquitto *mosq, void *obj, int result)$/;"	f
 my_connect_callback	./client/sub_client.c	/^void my_connect_callback(struct mosquitto *mosq, void *obj, int result)$/;"	f
@@ -878,6 +878,7 @@ on_unsubscribe	./lib/mosquitto_internal.h	/^	void (*on_unsubscribe)(struct mosqu
 on_unsubscribe	./test/lib/c/02-unsubscribe.c	/^void on_unsubscribe(struct mosquitto *mosq, void *obj, int mid)$/;"	f
 out_packet	./lib/mosquitto_internal.h	/^	struct _mosquitto_packet *out_packet;\/\/待发送出去的包的链表$/;"	m	struct:mosquitto	typeref:struct:mosquitto::_mosquitto_packet
 out_packet_last	./lib/mosquitto_internal.h	/^	struct _mosquitto_packet *out_packet_last;$/;"	m	struct:mosquitto	typeref:struct:mosquitto::_mosquitto_packet
+out_packet_last	./lib/mosquitto_internal.h	/^	struct _mosquitto_packet *out_packet_last;\/\/快速指向待输出数据列表的索引，mosq->out_packet_last->next = packet$/;"	m	struct:mosquitto	typeref:struct:mosquitto::_mosquitto_packet
 out_packet_mutex	./lib/mosquitto_internal.h	/^	pthread_mutex_t out_packet_mutex;$/;"	m	struct:mosquitto
 output_new_password	./src/mosquitto_passwd.c	/^int output_new_password(FILE *fptr, const char *username, const char *password)$/;"	f
 packet_length	./lib/mosquitto_internal.h	/^	uint32_t packet_length;$/;"	m	struct:_mosquitto_packet
@@ -931,7 +932,7 @@ qos	./src/mosquitto_broker.h	/^	int qos;$/;"	m	struct:_mqtt3_bridge_topic
 qos	./src/mosquitto_broker.h	/^	int qos;$/;"	m	struct:mosquitto_client_msg
 qos	./test/qos.c	/^	int qos;$/;"	m	struct:sub	file:
 queue_len	./lib/mosquitto_internal.h	/^	int queue_len;$/;"	m	struct:mosquitto
-queue_qos0_messages	./src/mosquitto_broker.h	/^	bool queue_qos0_messages;$/;"	m	struct:mqtt3_config
+queue_qos0_messages	./src/mosquitto_broker.h	/^	bool queue_qos0_messages;\/\/如果客户端挂了，qos0的消息是否保存离线记录$/;"	m	struct:mqtt3_config
 quiet	./client/pub_client.c	/^static bool quiet = false;$/;"	v	file:
 quiet	./client/sub_client.c	/^	bool quiet;$/;"	m	struct:userdata	file:
 rand_publish	./test/qos.c	/^void rand_publish(struct mosquitto *mosq, const char *topic, int qos)$/;"	f
@@ -940,7 +941,7 @@ received_count	./test/qos.c	/^int received_count = 0;$/;"	v
 reconnect_delay	./lib/mosquitto_internal.h	/^	unsigned int reconnect_delay;$/;"	m	struct:mosquitto
 reconnect_delay_max	./lib/mosquitto_internal.h	/^	unsigned int reconnect_delay_max;$/;"	m	struct:mosquitto
 reconnect_exponential_backoff	./lib/mosquitto_internal.h	/^	bool reconnect_exponential_backoff;$/;"	m	struct:mosquitto
-ref_count	./src/mosquitto_broker.h	/^	int ref_count;$/;"	m	struct:mosquitto_msg_store
+ref_count	./src/mosquitto_broker.h	/^	int ref_count;\/\/被多少mosquitto_client_msg客户端消息引用了$/;"	m	struct:mosquitto_msg_store
 remaining_count	./lib/mosquitto_internal.h	/^	uint8_t remaining_count;\/\/ remaining字段包含几个字节$/;"	m	struct:_mosquitto_packet
 remaining_length	./lib/mosquitto_internal.h	/^	uint32_t remaining_length;\/\/remaining字段的表示的长度，也就是数据长度$/;"	m	struct:_mosquitto_packet
 remaining_mult	./lib/mosquitto_internal.h	/^	uint32_t remaining_mult;$/;"	m	struct:_mosquitto_packet
@@ -1018,14 +1019,14 @@ status	./client/pub_client.c	/^static int status = STATUS_CONNECTING;$/;"	v	file
 stmt	./examples/mysql_log/mysql_log.c	/^static MYSQL_STMT *stmt = NULL;$/;"	v	file:
 stop	./test/msgsps_pub.c	/^static struct timeval start, stop;$/;"	v	typeref:struct:	file:
 stop	./test/msgsps_sub.c	/^static struct timeval start, stop;$/;"	v	typeref:struct:	file:
-store	./src/mosquitto_broker.h	/^	struct mosquitto_msg_store *store;$/;"	m	struct:mosquitto_client_msg	typeref:struct:mosquitto_client_msg::mosquitto_msg_store
+store	./src/mosquitto_broker.h	/^	struct mosquitto_msg_store *store;\/\/\/指向这条消息的综合结构$/;"	m	struct:mosquitto_client_msg	typeref:struct:mosquitto_client_msg::mosquitto_msg_store
 store_clean_interval	./src/mosquitto_broker.h	/^	int store_clean_interval;$/;"	m	struct:mqtt3_config
 sub	./test/qos.c	/^struct sub{$/;"	s	file:
 subhier_clean	./src/database.c	/^static void subhier_clean(struct _mosquitto_subhier *subhier)$/;"	f	file:
-subs	./src/mosquitto_broker.h	/^	struct _mosquitto_subhier subs;\/\/树形的订阅关系列表$/;"	m	struct:mosquitto_db	typeref:struct:mosquitto_db::_mosquitto_subhier
-subs	./src/mosquitto_broker.h	/^	struct _mosquitto_subleaf *subs;$/;"	m	struct:_mosquitto_subhier	typeref:struct:_mosquitto_subhier::_mosquitto_subleaf
+subs	./src/mosquitto_broker.h	/^	struct _mosquitto_subhier subs;\/\/树形的订阅关系列表.该链表第一个节点为正常的topic订阅节点，第二个为$SYS系统状态订阅节点$/;"	m	struct:mosquitto_db	typeref:struct:mosquitto_db::_mosquitto_subhier
+subs	./src/mosquitto_broker.h	/^	struct _mosquitto_subleaf *subs;\/\/一个节点上订阅的客户端链表$/;"	m	struct:_mosquitto_subhier	typeref:struct:_mosquitto_subhier::_mosquitto_subleaf
 subs	./test/qos.c	/^struct sub subs[3];$/;"	v	typeref:struct:sub
-subscription_count	./src/mosquitto_broker.h	/^	int subscription_count;$/;"	m	struct:mosquitto_db
+subscription_count	./src/mosquitto_broker.h	/^	int subscription_count;\/\/总订阅量$/;"	m	struct:mosquitto_db
 sys_interval	./src/mosquitto_broker.h	/^	int sys_interval;$/;"	m	struct:mqtt3_config
 tail	./src/uthash.h	/^   struct UT_hash_handle *tail; \/* tail hh in app order, for fast append    *\/$/;"	m	struct:UT_hash_table	typeref:struct:UT_hash_table::UT_hash_handle
 tbl	./src/uthash.h	/^   struct UT_hash_table *tbl;$/;"	m	struct:UT_hash_handle	typeref:struct:UT_hash_handle::UT_hash_table

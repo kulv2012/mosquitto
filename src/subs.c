@@ -74,7 +74,7 @@ struct _sub_token {
 };
 
 static int _subs_process(struct mosquitto_db *db, struct _mosquitto_subhier *hier, const char *source_id, const char *topic, int qos, int retain, struct mosquitto_msg_store *stored, bool set_retain)
-{
+{//如果retain那么挂入当前节点的hier->retained指针一个消息。然后遍历每一个订阅的客户端，将当前消息挂入到其context->msg链表里面
 	int rc = 0;
 	int rc2;
 	int client_qos, msg_qos;
@@ -82,9 +82,9 @@ static int _subs_process(struct mosquitto_db *db, struct _mosquitto_subhier *hie
 	struct _mosquitto_subleaf *leaf;
 	bool client_retain;
 
-	leaf = hier->subs;
+	leaf = hier->subs;//扫描在这一层上订阅的客户端
 
-	if(retain && set_retain){
+	if(retain && set_retain){//如果retain为true，那么意思是这条消息以后任何人上线，都要给他发一次。其实就等于"每日推荐"一样
 #ifdef WITH_PERSISTENCE
 		if(strncmp(topic, "$SYS", 4)){
 			/* Retained messages count as a persistence change, but only if
@@ -95,10 +95,11 @@ static int _subs_process(struct mosquitto_db *db, struct _mosquitto_subhier *hie
 		if(hier->retained){
 			hier->retained->ref_count--;
 			/* FIXME - it would be nice to be able to remove the message from the store at this point if ref_count == 0 */
+			//但是还好，loop.c会处理这个的
 			db->retained_count--;
 		}
 		if(stored->msg.payloadlen){
-			hier->retained = stored;
+			hier->retained = stored;//指向db->msg_store中的某条消息，增加其引用计数
 			hier->retained->ref_count++;
 			db->retained_count++;
 		}else{
@@ -107,27 +108,27 @@ static int _subs_process(struct mosquitto_db *db, struct _mosquitto_subhier *hie
 	}
 	while(source_id && leaf){
 		if(leaf->context->is_bridge && !strcmp(leaf->context->id, source_id)){
-			leaf = leaf->next;
+			leaf = leaf->next;//是bridge并且当前订阅者就是自己，那么不发送，其实就是别发回给bridge就行.避免循环
 			continue;
 		}
-		/* Check for ACL topic access. */
+		/* Check for ACL topic access. *///看看这个客户端有没有权限接受消息
 		rc2 = mosquitto_acl_check(db, leaf->context, topic, MOSQ_ACL_READ);
 		if(rc2 == MOSQ_ERR_ACL_DENIED){
 			leaf = leaf->next;
 			continue;
 		}else if(rc2 == MOSQ_ERR_SUCCESS){
-			client_qos = leaf->qos;
+			client_qos = leaf->qos;//客户端要求的qos
 
 			if(db->config->upgrade_outgoing_qos){
-				msg_qos = client_qos;
-			}else{
+				msg_qos = client_qos;//如果这个客户端强制要求提升权限，那么允许她 
+			}else{//否则使用2者的最低权限发送 
 				if(qos > client_qos){
 					msg_qos = client_qos;
 				}else{
 					msg_qos = qos;
 				}
 			}
-			if(msg_qos){
+			if(msg_qos){//QOS大于0的消息必须有msgid,这个msgid每个连接一个
 				mid = _mosquitto_mid_generate(leaf->context);
 			}else{
 				mid = 0;
@@ -140,8 +141,9 @@ static int _subs_process(struct mosquitto_db *db, struct _mosquitto_subhier *hie
 			}else{
 				/* Client is not a bridge and this isn't a stale message so
 				 * retain should be false. */
-				client_retain = false;
+				client_retain = false;//你怎么知道不是旧消息？因为在上层已经检查过这个人之前有没有发送过消息的
 			}
+			//将一条消息插入到context->msg链表后面，设置相关的状态。然后记录这条消息给哪些人发送过等
 			if(mqtt3_db_message_insert(db, leaf->context, mid, mosq_md_out, msg_qos, client_retain, stored) == 1) rc = 1;
 		}else{
 			rc = 1;
@@ -256,7 +258,7 @@ static int _sub_add(struct mosquitto_db *db, struct mosquitto *context, int qos,
 	branch = subhier->children;
 	while(branch){//扫描一遍当前这个节点的子分支的topic段名称是否相等，相等的话就订阅到其下面，否则需要在末尾增加一个分支
 		if(!strcmp(branch->topic, tokens->topic)){
-			//找到，递归调用
+			//当前节找到，递归调用
 			return _sub_add(db, context, qos, branch, tokens->next);
 		}
 		last = branch;
@@ -335,24 +337,31 @@ static int _sub_search(struct mosquitto_db *db, struct _mosquitto_subhier *subhi
 		sr = set_retain;
 
 		if(tokens && tokens->topic && (!strcmp(branch->topic, tokens->topic) || !strcmp(branch->topic, "+"))){
+			//当前这个topic正好match了，或者通配符了,那么查找子节点
 			/* The topic matches this subscription.
 			 * Doesn't include # wildcards */
-			if(!strcmp(branch->topic, "+")){
+			if(!strcmp(branch->topic, "+")){//路径中出现通配符后，不允许retain
 				/* Don't set a retained message where + is in the hierarchy. */
 				sr = false;
 			}
 			if(_sub_search(db, branch, tokens->next, source_id, topic, qos, retain, stored, sr) == -1){
+				//继承一下下层的通配符处理命中结果 
 				flag = -1;
 			}
-			if(!tokens->next){
+			if(!tokens->next){//分段链表没有元素了，那么就是这个了
 				_subs_process(db, branch, source_id, topic, qos, retain, stored, sr);
 			}
+			//这里不return是因为担心允许多个match
 		}else if(!strcmp(branch->topic, "#") && !branch->children){
+			//万能通配符必须出现在后面 finance/# is valid but finance/#/closingprice is not valid
+			//当前这个分支是个万能通配符，并且没有子节点了，那么这就是了。不过需要设置标志位-1，代表在这一层已经统配处理过了
 			/* The topic matches due to a # wildcard - process the
 			 * subscriptions but *don't* return. Although this branch has ended
 			 * there may still be other subscriptions to deal with.
 			 */
 			_subs_process(db, branch, source_id, topic, qos, retain, stored, false);
+			//下面返回-1的意思是代表在本层节点是由于万能通配符匹配的，那么上层也可以发布订阅消息.
+			//比如 订阅树上有客户端订阅了a/b/#  ，那么如果有人发布了a/b/c, 那当前这一层可以发布消息，上一层也可以
 			flag = -1;
 		}
 		branch = branch->next;
@@ -470,11 +479,13 @@ int mqtt3_db_messages_queue(struct mosquitto_db *db, const char *source_id, cons
 			if(retain){
 				/* We have a message that needs to be retained, so ensure that the subscription
 				 * tree for its topic exists.
-				 */
+				 *///注意这个参数，为NULL的话，不会真的挂载订阅节点的，因为是NULL，没有客户端，但是会创建空的分支节点的
 				_sub_add(db, NULL, 0, subhier, tokens);
 			}
+			//下面搜索订阅树，如果碰到中间有人订阅万能通配符，那么返回-1，这是什么意思?
 			rc = _sub_search(db, subhier, tokens, source_id, topic, qos, retain, stored, true);
 			if(rc == -1){
+				//如果retain那么挂入当前节点的hier->retained指针一个消息。然后遍历每一个订阅的客户端，将当前消息挂入到其context->msg链表里面
 				_subs_process(db, subhier, source_id, topic, qos, retain, stored, true);
 				rc = 0;
 			}
@@ -493,7 +504,7 @@ int mqtt3_db_messages_queue(struct mosquitto_db *db, const char *source_id, cons
 		}
 		subhier = subhier->next;
 	}
-	while(tokens){
+	while(tokens){//老规矩释放空间
 		tail = tokens->next;
 		_mosquitto_free(tokens->topic);
 		_mosquitto_free(tokens);

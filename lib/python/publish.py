@@ -1,5 +1,4 @@
 #!/usr/bin/python
-# -*- coding: utf-8-*-
 
 # Copyright (c) 2010,2011 Roger Light <roger@atchoo.org>
 # All rights reserved.
@@ -29,10 +28,11 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import mosquitto
+import random
 
 def on_connect(mosq, obj, rc):
-    #mosq.subscribe("$SYS/#", 0)
-    mosq.subscribe("tokudu/#", 0)
+    mosq.subscribe("$SYS/#", 0)
+    mosq.subscribe("tokudu/kulvsub", 0)
     print("rc: "+str(rc))
 
 def on_message(mosq, obj, msg):
@@ -48,8 +48,10 @@ def on_log(mosq, obj, level, string):
     print(string)
 
 # If you want to use a specific client id, use
-#不clean_session
-mqttc = mosquitto.Mosquitto("kulvsub.py", False)
+mqttc = mosquitto.Mosquitto("kulvsub.py")
+# but note that the client id must be unique on the broker. Leaving the client
+# id parameter empty will generate a random id for you.
+mqttc = mosquitto.Mosquitto()
 mqttc.on_message = on_message
 mqttc.on_connect = on_connect
 mqttc.on_publish = on_publish
@@ -58,6 +60,7 @@ mqttc.on_subscribe = on_subscribe
 #mqttc.on_log = on_log
 mqttc.connect("211.151.86.220", 1883, 60)
 
-
-mqttc.loop_forever()
+msg = "abc"+ str(random.randint(1, 10000000000));
+res = mqttc.publish("tokudu/kulvsub", msg, 0, False)
+print "send:["+msg+"], res="+str(res)
 

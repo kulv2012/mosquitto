@@ -367,7 +367,7 @@ handle_connect_error:
 }
 
 int mqtt3_handle_disconnect(struct mosquitto_db *db, struct mosquitto *context)
-{
+{//只是将这个sock关闭，设置为INVALID，其连接事件等都没有清楚的，设置了stat为mosq_cs_disconnecting
 	if(!context){
 		return MOSQ_ERR_INVAL;
 	}
@@ -501,7 +501,7 @@ int mqtt3_handle_unsubscribe(struct mosquitto_db *db, struct mosquitto *context)
 
 		if(sub){
 			_mosquitto_log_printf(NULL, MOSQ_LOG_DEBUG, "\t%s", sub);
-			//从订阅树种移除掉这个订阅
+			//从订阅树中移除掉这个订阅
 			mqtt3_sub_remove(db, context, sub, &db->subs);
 			_mosquitto_log_printf(NULL, MOSQ_LOG_UNSUBSCRIBE, "%s %s", context->id, sub);
 			_mosquitto_free(sub);

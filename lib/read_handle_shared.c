@@ -79,7 +79,8 @@ int _mosquitto_handle_pingresp(struct mosquitto *mosq)
 }
 
 int _mosquitto_handle_pubackcomp(struct mosquitto *mosq, const char *type)
-{
+{//我们收到一条PUBCOMP的消息，那说明最开始是我们发送出去的PUBLISH给对方，所以这里说明一切搞定，删掉它，结尾
+	//其实这里很可能就是我们发布出去的消息，所以删掉只能从context->msgs删，然后减少db->msg_store中的引用计数
 	uint16_t mid;
 	int rc;
 
@@ -95,6 +96,7 @@ int _mosquitto_handle_pubackcomp(struct mosquitto *mosq, const char *type)
 	_mosquitto_log_printf(NULL, MOSQ_LOG_DEBUG, "Received %s from %s (Mid: %d)", type, mosq->id, mid);
 
 	if(mid){
+		//从context->msgs中删掉这条消息,减少db->msg_store中的引用计数
 		rc = mqtt3_db_message_delete(mosq, mid, mosq_md_out);
 		if(rc) return rc;
 	}
@@ -184,7 +186,7 @@ int _mosquitto_handle_pubrel(struct mosquitto_db *db, struct mosquitto *mosq)
 		_mosquitto_message_cleanup(&message);
 	}
 #endif
-	rc = _mosquitto_send_pubcomp(mosq, mid);
+	rc = _mosquitto_send_pubcomp(mosq, mid);//简单发条PUBCOMP消息
 	if(rc) return rc;
 
 	return MOSQ_ERR_SUCCESS;

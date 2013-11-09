@@ -113,9 +113,9 @@ void mqtt3_context_cleanup(struct mosquitto_db *db, struct mosquitto *context, b
 		_mosquitto_socket_close(context);
 		context->listener = NULL;
 	}
-	if(context->clean_session && db){
+	if(context->clean_session && db){//如果设置了clean_session那么丢掉这个客户端的所有数据，包括它订阅的东西，消息等
 		mqtt3_subs_clean_session(db, context, &db->subs);
-		mqtt3_db_messages_delete(context);
+		mqtt3_db_messages_delete(context);//删除其消息队列
 	}
 	if(context->address){
 		_mosquitto_free(context->address);

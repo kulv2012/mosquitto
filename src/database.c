@@ -37,7 +37,7 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <send_mosq.h>
 #include <time_mosq.h>
 
-static int max_inflight = 20;
+static int max_inflight = 20;//一次
 static int max_queued = 100;
 #ifdef WITH_SYS_TREE
 extern unsigned long g_msgs_dropped;
@@ -166,7 +166,7 @@ int mqtt3_db_client_count(struct mosquitto_db *db, unsigned int *count, unsigned
 }
 
 int mqtt3_db_message_delete(struct mosquitto *context, uint16_t mid, enum mosquitto_msg_direction dir)
-{
+{//将mid的消息从context->msgs中删掉
 	struct mosquitto_client_msg *tail, *last = NULL;
 	int msg_index = 0;
 	bool deleted = false;
@@ -177,6 +177,7 @@ int mqtt3_db_message_delete(struct mosquitto *context, uint16_t mid, enum mosqui
 	while(tail){
 		msg_index++;
 		if(tail->state == mosq_ms_queued && msg_index <= max_inflight){
+			//顺便改改状态，让更多的msg飞起来
 			tail->timestamp = mosquitto_time();
 			if(tail->direction == mosq_md_out){
 				switch(tail->qos){
@@ -197,6 +198,7 @@ int mqtt3_db_message_delete(struct mosquitto *context, uint16_t mid, enum mosqui
 			}
 		}
 		if(tail->mid == mid && tail->direction == dir){
+			//删掉这条消息，减少store的引用计数
 			msg_index--;
 			/* FIXME - it would be nice to be able to remove the stored message here if ref_count==0 */
 			tail->store->ref_count--;
@@ -293,6 +295,7 @@ int mqtt3_db_message_insert(struct mosquitto_db *db, struct mosquitto *context, 
 						break;
 				}
 			}else{
+				//是输入消息，这个肯定是第一次PUBLISH加进来的消息，所以状态为mosq_ms_wait_for_pubrel，也就是等待对方发送PUBREL告诉我们可以真正发布消息了
 				if(qos == 2){
 					state = mosq_ms_wait_for_pubrel;
 				}else{
@@ -390,7 +393,7 @@ int mqtt3_db_message_update(struct mosquitto *context, uint16_t mid, enum mosqui
 }
 
 int mqtt3_db_messages_delete(struct mosquitto *context)
-{
+{//删掉一个客户端的所有存储的msg
 	struct mosquitto_client_msg *tail, *next;
 
 	if(!context) return MOSQ_ERR_INVAL;
@@ -509,7 +512,7 @@ int mqtt3_db_message_store_find(struct mosquitto *context, uint16_t mid, struct 
 
 	*stored = NULL;
 	tail = context->msgs;
-	while(tail){
+	while(tail){//msgs遍历链表,其store指针指向了db->msg_store中的某一项
 		if(tail->store->source_mid == mid && tail->direction == mosq_md_in){
 			*stored = tail->store;
 			return MOSQ_ERR_SUCCESS;
@@ -541,14 +544,16 @@ int mqtt3_db_message_reconnect_reset(struct mosquitto *context)
 						break;
 					case 2:
 						if(msg->state == mosq_ms_wait_for_pubcomp){
+							//如果上次连接时的状态是我发了PUBREL，等待PUBCOMP包，那么现在重发PUBREL包。因为客户端肯定收到包了。
+							//不过实际中这里最好别依赖这个，而是重新发送一个原始数据包。
 							msg->state = mosq_ms_resend_pubrel;
-						}else{
+						}else{//重头开始发送，因为我无法确定对方接收到了消息。当然还有一个PUBREC状态，但那个很短暂的
 							msg->state = mosq_ms_publish_qos2;
 						}
 						break;
 				}
 			}
-		}else{
+		}else{//如果是客户端发送给我们的消息，那么如果其QOS<2，很简单，我们肯定处理过了，丢掉就行。顶多客户端会重发的
 			if(msg->qos != 2){
 				/* Anything <QoS 2 can be completely retried by the client at
 				 * no harm. */
@@ -562,7 +567,7 @@ int mqtt3_db_message_reconnect_reset(struct mosquitto *context)
 					_mosquitto_free(msg);
 					msg = context->msgs;
 				}
-			}else{
+			}else{//是2级的话，客户端肯定还会重发的，没事
 				/* Message state can be preserved here because it should match
 				 * whatever the client has got. */
 			}
@@ -576,7 +581,7 @@ int mqtt3_db_message_reconnect_reset(struct mosquitto *context)
 	 * get sent until the client next receives a message - and they
 	 * will be sent out of order.
 	 */
-	if(context->msgs){
+	if(context->msgs){//如果有消息
 		count = 0;
 		msg = context->msgs;
 		while(msg && (max_inflight == 0 || count < max_inflight)){
@@ -649,7 +654,7 @@ int mqtt3_db_message_timeout_check(struct mosquitto_db *db, unsigned int timeout
 }
 
 int mqtt3_db_message_release(struct mosquitto_db *db, struct mosquitto *context, uint16_t mid, enum mosquitto_msg_direction dir)
-{
+{//扫描一个连接的消息列表，将其mosq_ms_queued尽量改为发送出去，如果找到参数mid的消息，那么将其PUBLISH发布出去，然后删掉它
 	struct mosquitto_client_msg *tail, *last = NULL;
 	int qos;
 	int retain;
@@ -663,9 +668,9 @@ int mqtt3_db_message_release(struct mosquitto_db *db, struct mosquitto *context,
 	tail = context->msgs;
 	while(tail){
 		msg_index++;
-		if(tail->state == mosq_ms_queued && msg_index <= max_inflight){
+		if(tail->state == mosq_ms_queued && msg_index <= max_inflight){//一次可以在发送过程中的消息最大不能超过max_inflight
 			tail->timestamp = mosquitto_time();
-			if(tail->direction == mosq_md_out){
+			if(tail->direction == mosq_md_out){//不管什么，只要是输出消息，状态改为可以发送
 				switch(tail->qos){
 					case 0:
 						tail->state = mosq_ms_publish_qos0;
@@ -678,13 +683,13 @@ int mqtt3_db_message_release(struct mosquitto_db *db, struct mosquitto *context,
 						break;
 				}
 			}else{
-				if(tail->qos == 2){
+				if(tail->qos == 2){//客户端发送来的2级消息, 丫的还在排队，直接返回PUBREC,等待PUBREL
 					_mosquitto_send_pubrec(context, tail->mid);
 					tail->state = mosq_ms_wait_for_pubrel;
 				}
 			}
 		}
-		if(tail->mid == mid && tail->direction == dir){
+		if(tail->mid == mid && tail->direction == dir){//正好是我要找的这条，且方向也对
 			qos = tail->store->msg.qos;
 			topic = tail->store->msg.topic;
 			retain = tail->retain;
@@ -694,6 +699,7 @@ int mqtt3_db_message_release(struct mosquitto_db *db, struct mosquitto *context,
 			 * denied/dropped and is being processed so the client doesn't
 			 * keep resending it. That means we don't send it to other
 			 * clients. */
+			//mqtt3_db_messages_queue将这条消息发布出去，然后if里面删掉这条消息
 			if(!topic || !mqtt3_db_messages_queue(db, source_id, topic, qos, retain, tail->store)){
 				tail->store->ref_count--;
 				if(last){
@@ -747,7 +753,7 @@ int mqtt3_db_message_write(struct mosquitto *context)
 	tail = context->msgs;
 	while(tail){
 		if(tail->direction == mosq_md_in){
-			msg_count++;
+			msg_count++;//这是哭的发送给我们的消息
 		}
 		if(tail->state != mosq_ms_queued){
 			mid = tail->mid;

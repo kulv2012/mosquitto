@@ -66,7 +66,7 @@ enum mosquitto_msg_state {
 	mosq_ms_resend_pubcomp = 8,
 	mosq_ms_wait_for_pubcomp = 9,
 	mosq_ms_send_pubrec = 10,
-	mosq_ms_queued = 11	//消息等待发送
+	mosq_ms_queued = 11	//消息等待发送,之所以有这个状态，是因为有最大inflight消息限制，比如max_inflight，也就是说没有稳妥搞定的消息最大条数
 };
 
 enum mosquitto_client_state {
@@ -112,7 +112,7 @@ struct mosquitto {
 	time_t last_msg_in;
 	time_t last_msg_out;
 	time_t ping_t;
-	uint16_t last_mid;
+	uint16_t last_mid;//这个连接的上一个msgid
 	struct _mosquitto_packet in_packet;//客户端发送过来的最后一个包
 	struct _mosquitto_packet *current_out_packet;//当前正在发送中的数据包，可能只发送了一部分
 	struct _mosquitto_packet *out_packet;//待发送出去的包的链表
@@ -132,7 +132,7 @@ struct mosquitto {
 #ifdef WITH_BROKER
 	bool is_bridge;
 	struct _mqtt3_bridge *bridge;
-	struct mosquitto_client_msg *msgs;//这个连接的消息链表,新的放在后面
+	struct mosquitto_client_msg *msgs;//这个连接的消息链表,新的放在后面，输入输出消息都放在这里
 	struct _mosquitto_acl_user *acl_list;
 	struct _mqtt3_listener *listener; //指向我所属的listener的db->config->listeners[i]位置
 	time_t disconnect_t;

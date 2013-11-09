@@ -76,7 +76,7 @@ int _mosquitto_send_pingresp(struct mosquitto *mosq)
 }
 
 int _mosquitto_send_puback(struct mosquitto *mosq, uint16_t mid)
-{
+{//对于1级消息，接受到PUBLISH消息后，可以立即发送出去。然后用这个函数给客户端发送PUBACK包通知其发送成功
 #ifdef WITH_BROKER
 	if(mosq) _mosquitto_log_printf(NULL, MOSQ_LOG_DEBUG, "Sending PUBACK to %s (Mid: %d)", mosq->id, mid);
 #else
@@ -148,7 +148,7 @@ int _mosquitto_send_pubrel(struct mosquitto *mosq, uint16_t mid, bool dup)
 
 /* For PUBACK, PUBCOMP, PUBREC, and PUBREL */
 int _mosquitto_send_command_with_mid(struct mosquitto *mosq, uint8_t command, uint16_t mid, bool dup)
-{
+{//给客户端发送一条带MID的消息
 	struct _mosquitto_packet *packet = NULL;
 	int rc;
 
@@ -170,6 +170,7 @@ int _mosquitto_send_command_with_mid(struct mosquitto *mosq, uint8_t command, ui
 	packet->payload[packet->pos+0] = MOSQ_MSB(mid);
 	packet->payload[packet->pos+1] = MOSQ_LSB(mid);
 
+	//将packet参数指向的包放入mosq->out_packet链表的尾部，并顺带触发一次数据发送
 	return _mosquitto_packet_queue(mosq, packet);
 }
 

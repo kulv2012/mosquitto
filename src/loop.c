@@ -206,6 +206,7 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 		}
 #endif
 		//store_clean_interval为Time in seconds between cleaning the internal message store of unreferenced messages.
+		//定期扫描db->msg_store里面存储的消息列表，去掉哪些已经么有使用的，比如全部都发出去了的，得去掉
 		if(!db->config->store_clean_interval || last_store_clean + db->config->store_clean_interval < mosquitto_time()){
 			mqtt3_db_store_clean(db);
 			last_store_clean = mosquitto_time();
