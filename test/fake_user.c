@@ -27,6 +27,7 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,16 +40,31 @@ void my_connect_callback(struct mosquitto *mosq, void *obj, int result)
 {
 	char topic[100];
 
-	if(!result){
+	if(!result){//随机订阅一个topic
 		snprintf(topic, 100, "fake/%d", getpid()%100);
 		mosquitto_subscribe(mosq, NULL, topic, rand()%3);
 	}
 }
+void my_subscribe_callback(struct mosquitto *mosq, void *userdata, int mid, int qos_count, const int *granted_qos){
+	//mosq->on_subscribe(mosq, mosq->userdata, mid, qos_count, granted_qos);
+	printf("my_subscribe_callback called.msgid:[%d]\n", (int)mid);
+}
 
+void my_message_callback(struct mosquitto *mosq, void *obj, const struct mosquitto_message *message)
+{
+	struct userdata *ud;
+
+	assert(obj);
+	ud = (struct userdata *)obj;
+
+	if(message->payloadlen){
+		printf("my_message_callback:msg[%s]\n", (const char *)message->payload);
+	}
+}
 int main(int argc, char *argv[])
 {
 	char id[30];
-	char *host = "localhost";
+	char *host = "211.151.86.220";
 	int port = 1883;
 	int keepalive = 60;
 	bool clean_session = false;
@@ -81,8 +97,10 @@ int main(int argc, char *argv[])
 		}
 	}
 	mosquitto_connect_callback_set(mosq, my_connect_callback);
+	mosquitto_subscribe_callback_set(mosq, my_subscribe_callback) ;
+	mosquitto_message_callback_set(mosq, my_message_callback) ;
 	while(1){
-		clean_session = rand()%10==0?false:true;
+		//clean_session = rand()%10==0?false:true;
 
 		if(mosquitto_connect(mosq, host, port, keepalive)){
 			fprintf(stderr, "Unable to connect.\n");
@@ -90,16 +108,19 @@ int main(int argc, char *argv[])
 		}
 		mosquitto_subscribe(mosq, NULL, "#", 0);
 
-		while(!mosquitto_loop(mosq, -1, 5)){
+		while(!mosquitto_loop(mosq, 1, 5)){
 			if(rand()%100==0){
 				snprintf(topic, 100, "fake/%d", rand()%100);
 				mosquitto_publish(mosq, NULL, topic, 10, "0123456789", rand()%3, rand()%2);
+				printf("mosquitto_publish:%s = %s\n", topic, "0123456789");
 			}
 			if(rand()%50==0){
+				printf("mosquitto_disconnect\n");
 				mosquitto_disconnect(mosq);
 			}
 		}
-		sleep(10);
+		printf("while-end,mosquitto_connect again\n");
+		//sleep(10);
 	}
 	mosquitto_destroy(mosq);
 	mosquitto_lib_cleanup();

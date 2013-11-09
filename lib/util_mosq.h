@@ -31,7 +31,6 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include <stdio.h>
 
-#include "tls_mosq.h"
 #include "mosquitto.h"
 
 int _mosquitto_packet_alloc(struct _mosquitto_packet *packet);

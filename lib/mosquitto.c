@@ -46,7 +46,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #include "read_handle.h"
 #include "send_mosq.h"
 #include "time_mosq.h"
-#include "tls_mosq.h"
 #include "util_mosq.h"
 #include "will_mosq.h"
 

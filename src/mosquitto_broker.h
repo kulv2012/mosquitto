@@ -36,7 +36,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <mosquitto_internal.h>
 #include <mosquitto_plugin.h>
 #include <mosquitto.h>
-#include "tls_mosq.h"
 #include "uthash.h"
 
 #ifndef __GNUC__
