@@ -594,8 +594,6 @@ int _config_read_file(struct mqtt3_config *config, bool reload, const char *file
 						cr->log_dest_set = 1;
 						if(!strcmp(token, "none")){
 							cr->log_dest = MQTT3_LOG_NONE;
-						}else if(!strcmp(token, "syslog")){
-							cr->log_dest |= MQTT3_LOG_SYSLOG;
 						}else if(!strcmp(token, "stdout")){
 							cr->log_dest |= MQTT3_LOG_STDOUT;
 						}else if(!strcmp(token, "stderr")){

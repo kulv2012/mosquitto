@@ -29,7 +29,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
-#include <syslog.h>
 
 #ifndef CMAKE
 #endif
@@ -43,7 +42,6 @@ extern struct mosquitto_db int_db;
 /* Options for logging should be:
  *
  * A combination of:
- * Via syslog
  * To a file
  * To stdout/stderr
  * To topics
@@ -61,19 +59,11 @@ int mqtt3_log_init(int priorities, int destinations)
 
 	log_priorities = priorities;
 	log_destinations = destinations;
-	//如果配置了用syslog,则打开系统日志，进行初始化
-	if(log_destinations & MQTT3_LOG_SYSLOG){
-		openlog("mosquitto", LOG_PID, LOG_DAEMON);
-	}
-
 	return rc;
 }
 
 int mqtt3_log_close(void)
 {
-	if(log_destinations & MQTT3_LOG_SYSLOG){
-		closelog();
-	}
 	/* FIXME - do something for all destinations! */
 
 	return MOSQ_ERR_SUCCESS;
@@ -86,42 +76,33 @@ int _mosquitto_log_printf(struct mosquitto *mosq, int priority, const char *fmt,
 	char *st;
 	int len;
 	const char *topic;
-	int syslog_priority;
 	time_t now = time(NULL);
 
 	if((log_priorities & priority) && log_destinations != MQTT3_LOG_NONE){
 		switch(priority){
 			case MOSQ_LOG_SUBSCRIBE:
 				topic = "$SYS/broker/log/M/subscribe";
-				syslog_priority = LOG_NOTICE;
 				break;
 			case MOSQ_LOG_UNSUBSCRIBE:
 				topic = "$SYS/broker/log/M/unsubscribe";
-				syslog_priority = LOG_NOTICE;
 				break;
 			case MOSQ_LOG_DEBUG:
 				topic = "$SYS/broker/log/D";
-				syslog_priority = LOG_DEBUG;
 				break;
 			case MOSQ_LOG_ERR:
 				topic = "$SYS/broker/log/E";
-				syslog_priority = LOG_ERR;
 				break;
 			case MOSQ_LOG_WARNING:
 				topic = "$SYS/broker/log/W";
-				syslog_priority = LOG_WARNING;
 				break;
 			case MOSQ_LOG_NOTICE:
 				topic = "$SYS/broker/log/N";
-				syslog_priority = LOG_NOTICE;
 				break;
 			case MOSQ_LOG_INFO:
 				topic = "$SYS/broker/log/I";
-				syslog_priority = LOG_INFO;
 				break;
 			default:
 				topic = "$SYS/broker/log/E";
-				syslog_priority = LOG_ERR;
 		}
 		len = strlen(fmt) + 500;//够山寨,日志后面的可变参数部分最长限制为500个字符
 		s = _mosquitto_malloc(len*sizeof(char));
@@ -156,10 +137,8 @@ int _mosquitto_log_printf(struct mosquitto *mosq, int priority, const char *fmt,
 				fprintf(int_db.config->log_fptr, "%s\n", s);
 			}
 		}
-		if(log_destinations & MQTT3_LOG_SYSLOG){
-			syslog(syslog_priority, "%s", s);
-		}
 		if(log_destinations & MQTT3_LOG_TOPIC && priority != MOSQ_LOG_DEBUG){
+			//这里是一个好功能，将指定消息发布，这样就可以方便的监控内部状态了
 			if(int_db.config && int_db.config->log_timestamp){
 				len += 30;
 				st = _mosquitto_malloc(len*sizeof(char));

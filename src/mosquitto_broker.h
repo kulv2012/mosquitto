@@ -43,7 +43,6 @@ POSSIBILITY OF SUCH DAMAGE.
 
 /* Log destinations */
 #define MQTT3_LOG_NONE 0x00
-#define MQTT3_LOG_SYSLOG 0x01
 #define MQTT3_LOG_FILE 0x02
 #define MQTT3_LOG_STDOUT 0x04
 #define MQTT3_LOG_STDERR 0x08
