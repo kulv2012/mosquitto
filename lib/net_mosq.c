@@ -106,6 +106,15 @@ int _mosquitto_packet_queue(struct mosquitto *mosq, struct _mosquitto_packet *pa
 	packet->to_process = packet->packet_length;//初始化的时候，一个包啥都没有发送出去
 
 	packet->next = NULL;
+#ifdef WITH_BROKER
+	if(mosq->out_packet){//out_packet用来建立要发送的包的列表,将新数据放到末尾
+		mosq->out_packet_last->next = packet;
+	}else{
+		mosq->out_packet = packet;//就一个
+	}
+	mosq->out_packet_last = packet;
+	return _mosquitto_packet_write(mosq);//尝试发送一次
+#else
 	pthread_mutex_lock(&mosq->out_packet_mutex);
 	if(mosq->out_packet){//out_packet用来建立要发送的包的列表,将新数据放到末尾
 		mosq->out_packet_last->next = packet;
@@ -114,9 +123,7 @@ int _mosquitto_packet_queue(struct mosquitto *mosq, struct _mosquitto_packet *pa
 	}
 	mosq->out_packet_last = packet;
 	pthread_mutex_unlock(&mosq->out_packet_mutex);
-#ifdef WITH_BROKER
-	return _mosquitto_packet_write(mosq);//尝试发送一次
-#else
+
 	if(mosq->in_callback == false && mosq->threaded == false){
 		return _mosquitto_packet_write(mosq);//客户端尽量触发一下数据写发送
 	}else{
@@ -373,8 +380,10 @@ int _mosquitto_packet_write(struct mosquitto *mosq)
 	if(!mosq) return MOSQ_ERR_INVAL;
 	if(mosq->sock == INVALID_SOCKET) return MOSQ_ERR_NO_CONN;
 
+#ifndef WITH_BROKER
 	pthread_mutex_lock(&mosq->current_out_packet_mutex);
 	pthread_mutex_lock(&mosq->out_packet_mutex);
+#endif
 	if(mosq->out_packet && !mosq->current_out_packet){//这里说明当前的这个包已经发送完成了，需要从out_packet获取一个
 		mosq->current_out_packet = mosq->out_packet;
 		mosq->out_packet = mosq->out_packet->next;
@@ -382,7 +391,9 @@ int _mosquitto_packet_write(struct mosquitto *mosq)
 			mosq->out_packet_last = NULL;
 		}
 	}
+#ifndef WITH_BROKER
 	pthread_mutex_unlock(&mosq->out_packet_mutex);
+#endif 
 
 	while(mosq->current_out_packet){
 		packet = mosq->current_out_packet;
@@ -398,10 +409,14 @@ int _mosquitto_packet_write(struct mosquitto *mosq)
 			}else{
 				//发送失败，如果返回EAGAIN，那解锁，下回再来
 				if(errno == EAGAIN || errno == COMPAT_EWOULDBLOCK){
+#ifndef WITH_BROKER
 					pthread_mutex_unlock(&mosq->current_out_packet_mutex);
+#endif
 					return MOSQ_ERR_SUCCESS;
 				}else{//挂了
+#ifndef WITH_BROKER
 					pthread_mutex_unlock(&mosq->current_out_packet_mutex);
+#endif
 					switch(errno){
 						case COMPAT_ECONNRESET:
 							return MOSQ_ERR_CONN_LOST;
@@ -434,7 +449,9 @@ int _mosquitto_packet_write(struct mosquitto *mosq)
 #endif
 
 		/* Free data and reset values */
+#ifndef WITH_BROKER
 		pthread_mutex_lock(&mosq->out_packet_mutex);
+#endif
 		mosq->current_out_packet = mosq->out_packet;//继续处理下一个
 		if(mosq->out_packet){
 			mosq->out_packet = mosq->out_packet->next;
@@ -442,17 +459,25 @@ int _mosquitto_packet_write(struct mosquitto *mosq)
 				mosq->out_packet_last = NULL;
 			}
 		}
+#ifndef WITH_BROKER
 		pthread_mutex_unlock(&mosq->out_packet_mutex);
 
-		//释放删除这个包，这里不需要处理状态的问题
 		_mosquitto_packet_cleanup(packet);
 		_mosquitto_free(packet);
 
 		pthread_mutex_lock(&mosq->msgtime_mutex);
 		mosq->last_msg_out = mosquitto_time();
 		pthread_mutex_unlock(&mosq->msgtime_mutex);
+#else 
+		//释放删除这个包，这里不需要处理状态的问题
+		_mosquitto_packet_cleanup(packet);
+		_mosquitto_free(packet);
+		mosq->last_msg_out = mosquitto_time();
+#endif
 	}
+#ifndef WITH_BROKER
 	pthread_mutex_unlock(&mosq->current_out_packet_mutex);
+#endif 
 	return MOSQ_ERR_SUCCESS;
 }
 
@@ -590,9 +615,14 @@ int _mosquitto_packet_read(struct mosquitto *mosq)
 	/* Free data and reset values */
 	_mosquitto_packet_cleanup(&mosq->in_packet);
 
+#ifndef WITH_BROKER
 	pthread_mutex_lock(&mosq->msgtime_mutex);
 	mosq->last_msg_in = mosquitto_time();
 	pthread_mutex_unlock(&mosq->msgtime_mutex);
+#else
+	mosq->last_msg_in = mosquitto_time();
+#endif
+
 	return rc;
 }
 

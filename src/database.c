@@ -97,6 +97,9 @@ int mqtt3_db_open(struct mqtt3_config *config, struct mosquitto_db *db)
 	db->subs.children->next = child;//该链表第一个节点为正常的topic订阅节点，第二个为$SYS系统状态订阅节点
 
 	db->unpwd = NULL;
+	
+	db->waiting_auth_list = NULL ;//等待后端线程进行验证的链表
+	db->finished_auth_list = NULL ;
 
 #ifdef WITH_PERSISTENCE
 	if(config->persistence && config->persistence_filepath){
@@ -133,8 +136,24 @@ static void subhier_clean(struct _mosquitto_subhier *subhier)
 
 int mqtt3_db_close(struct mosquitto_db *db)
 {
+	struct _mosquitto_auth_list *tmp = NULL ;
 	subhier_clean(db->subs.children);
 	mqtt3_db_store_clean(db);
+
+	//释放等待后端线程验证的客户端列表
+	while(db->waiting_auth_list != NULL){
+		tmp = db->waiting_auth_list ;
+		db->waiting_auth_list = tmp->next ;
+		mqtt3_context_cleanup(db, tmp->context, true); 
+		_mosquitto_free( tmp ) ;
+	}
+	//释放等待后端线程验证的客户端列表
+	while(db->finished_auth_list != NULL){
+		tmp = db->finished_auth_list ;
+		db->finished_auth_list = tmp->next ;
+		mqtt3_context_cleanup(db, tmp->context, true); 
+		_mosquitto_free( tmp ) ;
+	}
 
 	return MOSQ_ERR_SUCCESS;
 }
@@ -748,6 +767,9 @@ int mqtt3_db_message_write(struct mosquitto *context)
 			|| (context->state == mosq_cs_connected && !context->id)){
 		return MOSQ_ERR_INVAL;
 	}
+	/*if(context->state == mosq_cs_authorizing){
+		return MOSQ_ERR_SUCCESS;//正在验证中
+	}*/
 
 	tail = context->msgs;
 	while(tail){

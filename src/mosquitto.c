@@ -132,6 +132,7 @@ void handle_sigusr2(int signal)
 	flag_tree_print = true;
 }
 
+
 int main(int argc, char *argv[])
 {
 	int *listensock = NULL;
@@ -195,6 +196,7 @@ int main(int argc, char *argv[])
 		_mosquitto_log_printf(NULL, MOSQ_LOG_INFO, "Using default config.");
 	}
 
+	//安全验证模块，后续可以去掉
 	rc = mosquitto_security_module_init(&int_db);
 	if(rc) return rc;
 	rc = mosquitto_security_init(&int_db, false);
@@ -251,9 +253,15 @@ int main(int argc, char *argv[])
 	signal(SIGUSR2, handle_sigusr2);//直接printf一下订阅的树形结构，线上慎用，太大 
 	signal(SIGPIPE, SIG_IGN);
 
-
 	run = 1;
+
+	auth_thread_init( &int_db ) ;
+
 	rc = mosquitto_main_loop(&int_db, listensock, listensock_count, listener_max);
+
+
+	//等待线程退出
+	auth_thread_destroy(&int_db ) ;
 
 	_mosquitto_log_printf(NULL, MOSQ_LOG_INFO, "mosquitto version %s terminating", VERSION);
 	mqtt3_log_close();
@@ -286,6 +294,8 @@ int main(int argc, char *argv[])
 
 	if(config.pid_file){
 		remove(config.pid_file);
+		_mosquitto_free(config.pid_file);
+		config.pid_file = NULL ;
 	}
 
 	mqtt3_config_cleanup(int_db.config);

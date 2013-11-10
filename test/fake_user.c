@@ -44,6 +44,7 @@ void my_connect_callback(struct mosquitto *mosq, void *obj, int result)
 		snprintf(topic, 100, "fake/%d", getpid()%100);
 		mosquitto_subscribe(mosq, NULL, topic, rand()%3);
 	}
+	printf("my_connect_callback, result[%d]\n", result);
 }
 void my_subscribe_callback(struct mosquitto *mosq, void *userdata, int mid, int qos_count, const int *granted_qos){
 	//mosq->on_subscribe(mosq, mosq->userdata, mid, qos_count, granted_qos);
@@ -64,6 +65,8 @@ void my_message_callback(struct mosquitto *mosq, void *obj, const struct mosquit
 int main(int argc, char *argv[])
 {
 	char id[30];
+	char username[32];
+	char password[32] ;
 	char *host = "211.151.86.220";
 	int port = 1883;
 	int keepalive = 60;
@@ -101,6 +104,10 @@ int main(int argc, char *argv[])
 	mosquitto_message_callback_set(mosq, my_message_callback) ;
 	while(1){
 		//clean_session = rand()%10==0?false:true;
+
+		snprintf(username, 31, "username_%d", rand()%10 ) ;
+		snprintf(password, 31, "password_%d", rand()%10 ) ;
+		mosquitto_username_pw_set(mosq, username, password) ;
 
 		if(mosquitto_connect(mosq, host, port, keepalive)){
 			fprintf(stderr, "Unable to connect.\n");

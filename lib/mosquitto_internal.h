@@ -34,7 +34,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include <stdlib.h>
 
-#if defined(WITH_THREADING) && !defined(WITH_BROKER)
+#if defined(WITH_THREADING) 
 #  include <pthread.h>
 #else
 #  include <dummypthread.h>
@@ -70,10 +70,10 @@ enum mosquitto_msg_state {
 
 enum mosquitto_client_state {
 	mosq_cs_new = 0,
-	mosq_cs_connected = 1,
-	mosq_cs_disconnecting = 2,
-	mosq_cs_connect_async = 3,
-	mosq_cs_connect_pending = 4
+	mosq_cs_connected ,
+	mosq_cs_disconnecting ,
+	mosq_cs_connect_async,
+	mosq_cs_connect_pending
 };
 
 struct _mosquitto_packet{
@@ -116,8 +116,6 @@ struct mosquitto {
 	struct _mosquitto_packet *current_out_packet;//当前正在发送中的数据包，可能只发送了一部分
 	struct _mosquitto_packet *out_packet;//待发送出去的包的链表
 	struct mosquitto_message *will;
-	bool want_read;
-	bool want_write;
 #if defined(WITH_THREADING) && !defined(WITH_BROKER)
 	pthread_mutex_t callback_mutex;
 	pthread_mutex_t log_callback_mutex;
@@ -138,6 +136,8 @@ struct mosquitto {
 	int pollfd_index;
 	int db_index;//记住我在db->contexts中的下标
 	struct _mosquitto_packet *out_packet_last;//快速指向待输出数据列表的索引，mosq->out_packet_last->next = packet
+
+	int auth_result ;
 #else
 	void *userdata;
 	bool in_callback;

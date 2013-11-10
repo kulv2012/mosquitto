@@ -29,6 +29,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
 
 
 #include <mosquitto_broker.h>
@@ -54,12 +55,8 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 	uint8_t will, will_retain, will_qos, clean_session;
 	uint8_t username_flag, password_flag;
 	char *username = NULL, *password = NULL;
-	int i;
 	int rc;
-	struct _mosquitto_acl_user *acl_tail;
 	int slen;
-	struct _clientid_index_hash *find_cih;
-	struct _clientid_index_hash *new_cih;
 
 #ifdef WITH_SYS_TREE
 	g_connection_count++;
@@ -120,6 +117,9 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 	password_flag = connect_flags & 0x40;
 	username_flag = connect_flags & 0x80;
 
+	context->clean_session = clean_session;
+	context->ping_t = 0;
+
 	if(_mosquitto_read_uint16(&context->in_packet, &(context->keepalive))){
 		mqtt3_context_disconnect(db, context);
 		return 1;
@@ -142,11 +142,12 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 		mqtt3_context_disconnect(db, context);
 		return 1;
 	}
+	context->id = client_id;
+	client_id = NULL;
 
 	/* clientid_prefixes check */
 	if(db->config->clientid_prefixes){//如果配置文件配置了客户端统一前缀clientid_prefixes，那么所有客户端昵称必须一致
-		if(strncmp(db->config->clientid_prefixes, client_id, strlen(db->config->clientid_prefixes))){
-			_mosquitto_free(client_id);
+		if(strncmp(db->config->clientid_prefixes, context->id, strlen(db->config->clientid_prefixes))){
 			_mosquitto_send_connack(context, CONNACK_REFUSED_NOT_AUTHORIZED);
 			mqtt3_context_disconnect(db, context);
 			return MOSQ_ERR_SUCCESS;
@@ -161,6 +162,7 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 			rc = MOSQ_ERR_NOMEM;
 			goto handle_connect_error;
 		}
+
 		if(_mosquitto_read_string(&context->in_packet, &will_topic)){
 			mqtt3_context_disconnect(db, context);
 			rc = 1;
@@ -192,6 +194,27 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 			rc = 1;
 			goto handle_connect_error;
 		}
+		//设置will-topic的相关信息，mqtt3_context_disconnect会用，判断连接不是主动断开的话会Publis一条消息
+		if(mosquitto_acl_check(db, context, will_topic, MOSQ_ACL_WRITE) != MOSQ_ERR_SUCCESS){
+			_mosquitto_send_connack(context, CONNACK_REFUSED_NOT_AUTHORIZED);
+			mqtt3_context_disconnect(db, context);
+			rc = MOSQ_ERR_SUCCESS;
+			goto handle_connect_error;
+		}
+		context->will = will_struct;
+		will_struct = NULL ;//设置为空，避免handle_connect_error释放。放到context上面后续释放即可
+		context->will->topic = will_topic;
+		will_topic = NULL ;
+		if(will_payload){
+			context->will->payload = will_payload;
+			context->will->payloadlen = will_payloadlen;
+			will_payload = NULL ;
+		}else{
+			context->will->payload = NULL;
+			context->will->payloadlen = 0;
+		}
+		context->will->qos = will_qos;
+		context->will->retain = will_retain;
 	}
 
 	if(username_flag){//读取用户名密码
@@ -216,22 +239,34 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 		}
 	}
 
-	if(username_flag){//如果发送了用户名密码，那么进行用户名密码校验
-		rc = mosquitto_unpwd_check(db, username, password);
-		if(rc == MOSQ_ERR_AUTH){//密码检查失败
-			_mosquitto_send_connack(context, CONNACK_REFUSED_BAD_USERNAME_PASSWORD);
+	context->username = username;
+	context->password = password;
+	username = NULL; /* Avoid free() in error: below. */
+	password = NULL;
+
+	if(username_flag && password_flag){//如果发送了用户名密码，那么进行用户名密码校验
+		//放入待验证的客户端链表头部
+
+		struct _mosquitto_auth_list * tmpauth = _mosquitto_calloc(1, sizeof(struct _mosquitto_auth_list));
+		if(tmpauth == NULL){
+			_mosquitto_send_connack(context, CONNACK_REFUSED_SERVER_UNAVAILABLE);
 			mqtt3_context_disconnect(db, context);
 			rc = MOSQ_ERR_SUCCESS;
 			goto handle_connect_error;
-		}else if(rc == MOSQ_ERR_INVAL){
-			goto handle_connect_error;
 		}
-		context->username = username;
-		context->password = password;
-		username = NULL; /* Avoid free() in error: below. */
-		password = NULL;
-	}
+		context->auth_result = CONNACK_REFUSED_NOT_AUTHORIZED ;
+		pthread_mutex_lock(&db->auth_list_mutex) ;
+		tmpauth->context = context ;
+		tmpauth->next = db->waiting_auth_list ;//如果db->waiting_auth_list为空这里也可以没事的
+		assert( context->sock != -1) ;
+		db->waiting_auth_list = tmpauth; 
 
+		db->contexts[context->db_index] = NULL ;//暂时将这个链接从contexts中移除出来,待验证完成后，放入finished_auth_list
+		context->db_index = -1 ;
+		pthread_mutex_unlock(&db->auth_list_mutex) ;
+		//rc = mosquitto_unpwd_check(db, context->username, context->password);
+		return MOSQ_ERR_SUCCESS ;
+	}
 	//查看系统是否允许匿名使用
 	if(!username_flag && db->config->allow_anonymous == false){
 		_mosquitto_send_connack(context, CONNACK_REFUSED_NOT_AUTHORIZED);
@@ -239,9 +274,80 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 		rc = MOSQ_ERR_SUCCESS;
 		goto handle_connect_error;
 	}
+	//没有用户名，那么OK，继续后面的处理
+	rc = mqtt3_handle_post_check_unpwd( db, context) ;
+	return rc ;
+
+handle_connect_error:
+	if(client_id) _mosquitto_free(client_id);
+	if(username) _mosquitto_free(username);
+	if(password) _mosquitto_free(password);
+	if(will_payload) _mosquitto_free(will_payload);
+	if(will_topic) _mosquitto_free(will_topic);
+	if(will_struct) _mosquitto_free(will_struct);
+	return rc;
+}
+
+int try_wakeup_finished_auth_connections( struct mosquitto_db *db ){
+	int i=0, dbidx = 0 ;
+	struct _mosquitto_auth_list * tofree = NULL;
+
+	pthread_mutex_lock(&db->auth_list_mutex) ; 
+	struct _mosquitto_auth_list * tmpauth = db->finished_auth_list ;
+	db->finished_auth_list = NULL ;
+	while( tmpauth ){
+		//将链表每个元素还原到contexts数组里面
+
+		assert(tmpauth->context->sock != -1);
+		for(i = dbidx ; i < db->context_count; i++){
+			if(db->contexts[i] == NULL){
+				db->contexts[i] = tmpauth->context ;
+				break ;
+			}
+		}
+		if( i == db->context_count){
+			struct mosquitto **tmp_contexts = NULL;
+			tmp_contexts = _mosquitto_realloc(db->contexts, sizeof(struct mosquitto*)*(db->context_count+1));
+			if(tmp_contexts){
+				db->context_count += 1; 
+				db->contexts = tmp_contexts;
+				db->contexts[i] = tmpauth->context;
+			}else{
+				//到这里，说明contexts[]数组不够了，而且relloac也失败，怎么办，只能丢掉这个连接了。但是下面并没有return -1,而且还去访问了。是个bug
+				// Out of memory
+				mqtt3_context_cleanup(NULL, tmpauth->context, true);
+				tmpauth = tmpauth->next ;
+				continue ;
+			}
+
+		}
+		//已经将这个连接放到contexts数组了。下面需要完成验证的后面部分
+		db->contexts[i]->db_index = i ;
+		mqtt3_handle_post_check_unpwd(db, db->contexts[i]) ;
+		dbidx = i+1 ;
+		tofree = tmpauth ;
+		tmpauth = tmpauth->next ;
+		_mosquitto_free( tofree ) ;
+	}
+
+	pthread_mutex_unlock(&db->auth_list_mutex) ;
+}
+int mqtt3_handle_post_check_unpwd( struct mosquitto_db *db, struct mosquitto *context ){
+	int rc = 0;
+	int i = 0;
+	struct _clientid_index_hash *find_cih;
+	struct _clientid_index_hash *new_cih;
+	struct _mosquitto_acl_user *acl_tail;
+
+	if(context->auth_result != CONNACK_ACCEPTED){//密码检查失败
+		_mosquitto_send_connack(context, CONNACK_REFUSED_BAD_USERNAME_PASSWORD);
+		mqtt3_context_disconnect(db, context);
+		rc = MOSQ_ERR_SUCCESS;
+		goto handle_connect_post_error;
+	}
 
 	/* Find if this client already has an entry. This must be done *after* any security checks. */
-	HASH_FIND_STR(db->clientid_index_hash, client_id, find_cih);
+	HASH_FIND_STR(db->clientid_index_hash, context->id, find_cih);
 	if(find_cih){
 		i = find_cih->db_context_index;//这个客户端在db->contexts[]数组中的位置
 		/* Found a matching client */
@@ -251,12 +357,14 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 		}else{//这个是肿么回事?
 			/* Client is already connected, disconnect old version */
 			if(db->config->connection_messages == true){
-				_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Client %s already connected, closing old connection.", client_id);
+				_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Client %s already connected, closing old connection.", context->id);
 			}
 		}
 		//清除上一次连接的相关信息，进行初始化，设置为新连接的信息，这里需要考虑离线消息的问题
-		db->contexts[i]->clean_session = clean_session;
+		assert( db->contexts[i] != context ) ;
+		db->contexts[i]->clean_session = context->clean_session;
 		mqtt3_context_cleanup(db, db->contexts[i], false);//可能会关闭多点登陆的旧连接
+
 
 		db->contexts[i]->state = mosq_cs_connected;
 		db->contexts[i]->address = _mosquitto_strdup(context->address);
@@ -266,10 +374,18 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 		db->contexts[i]->last_msg_out = mosquitto_time();
 		db->contexts[i]->keepalive = context->keepalive;
 		db->contexts[i]->pollfd_index = context->pollfd_index;
+		db->contexts[i]->id = _mosquitto_strdup(context->id);
 		if(context->username){
 			db->contexts[i]->username = _mosquitto_strdup(context->username);
 		}
+		if(context->password){
+			db->contexts[i]->password = _mosquitto_strdup(context->password);
+		}
+
+		_mosquitto_free(context->id);//参考mqtt3_context_cleanup，这里必须设置为空，否则db->clientid_index_hash会在那里被清楚
+		context->id = NULL;
 		context->sock = -1;
+		context->clean_session = 1 ;//让其待会在mosquitto_main_loop里面被清空
 		context->state = mosq_cs_disconnecting;
 		//上面这行是什么作用? 这个指针拿掉后，就没了，内存泄露？
 		//不是这样的，因为这个函数的上层调用方式为loop_handle_reads_writes()->_mosquitto_packet_read(db, db->contexts[i])
@@ -283,11 +399,6 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 		}
 	}
 
-	context->id = client_id;
-	client_id = NULL;
-	context->clean_session = clean_session;
-	context->ping_t = 0;
-
 	// Add the client ID to the DB hash table here
 	//已经在里面的不需要增加进去了吧,不是，在mqtt3_context_cleanup里面又del掉了···还得加一次
 	new_cih = _mosquitto_malloc(sizeof(struct _clientid_index_hash));
@@ -295,14 +406,14 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 		_mosquitto_log_printf(NULL, MOSQ_LOG_ERR, "Error: Out of memory.");
 		mqtt3_context_disconnect(db, context);
 		rc = MOSQ_ERR_NOMEM;
-		goto handle_connect_error;
+		goto handle_connect_post_error;
 	}
 	new_cih->id = context->id;
 	new_cih->db_context_index = context->db_index;
 	HASH_ADD_KEYPTR(hh, db->clientid_index_hash, context->id, strlen(context->id), new_cih);
 
 #ifdef WITH_PERSISTENCE
-	if(!clean_session){
+	if(!context->clean_session){
 		db->persistence_changes++;
 	}
 #endif
@@ -327,26 +438,6 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 		context->acl_list = NULL;
 	}
 
-	if(will_struct){//设置will-topic的相关信息，mqtt3_context_disconnect会用，判断连接不是主动断开的话会Publis一条消息
-		if(mosquitto_acl_check(db, context, will_topic, MOSQ_ACL_WRITE) != MOSQ_ERR_SUCCESS){
-			_mosquitto_send_connack(context, CONNACK_REFUSED_NOT_AUTHORIZED);
-			mqtt3_context_disconnect(db, context);
-			rc = MOSQ_ERR_SUCCESS;
-			goto handle_connect_error;
-		}
-		context->will = will_struct;
-		context->will->topic = will_topic;
-		if(will_payload){
-			context->will->payload = will_payload;
-			context->will->payloadlen = will_payloadlen;
-		}else{
-			context->will->payload = NULL;
-			context->will->payloadlen = 0;
-		}
-		context->will->qos = will_qos;
-		context->will->retain = will_retain;
-	}
-
 	if(db->config->connection_messages == true){
 		_mosquitto_log_printf(NULL, MOSQ_LOG_NOTICE, "New client connected from %s as %s (c%d, k%d).", context->address, context->id, context->clean_session, context->keepalive);
 	}
@@ -355,12 +446,7 @@ int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)
 	//给客户端发送连接成功的CONNACK回包
 	return _mosquitto_send_connack(context, CONNACK_ACCEPTED);
 
-handle_connect_error:
-	if(client_id) _mosquitto_free(client_id);
-	if(username) _mosquitto_free(username);
-	if(will_payload) _mosquitto_free(will_payload);
-	if(will_topic) _mosquitto_free(will_topic);
-	if(will_struct) _mosquitto_free(will_struct);
+handle_connect_post_error:
 	return rc;
 }
 

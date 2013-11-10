@@ -177,6 +177,12 @@ struct _clientid_index_hash{
 	UT_hash_handle hh;
 };
 
+//等待后端线程进行验证用户名密码的客户端连接列表
+struct _mosquitto_auth_list{
+	struct mosquitto *context ;
+	struct _mosquitto_auth_list * next ;
+};
+
 struct mosquitto_db{
 	dbid_t last_db_id;//msg_store上的消息的顺序id
 	struct _mosquitto_subhier subs;//树形的订阅关系列表.该链表第一个节点为正常的topic订阅节点，第二个为$SYS系统状态订阅节点
@@ -184,8 +190,8 @@ struct mosquitto_db{
 	struct _mosquitto_acl_user *acl_list;
 	struct _mosquitto_acl *acl_patterns;
 	struct mosquitto **contexts;//注意这个地方会不断变化，所以不要指向这个数组
+	int context_count;//contexts数组的总长度，不是实际长度
 	struct _clientid_index_hash *clientid_index_hash;//所有客户端id的哈希表,用来快速找到这个客户端在db->contexts数组中的位置的
-	int context_count;
 	struct mosquitto_msg_store *msg_store;//这里是所有publish的消息，都在这.新消息插入头部
 	int msg_store_count;
 	struct mqtt3_config *config;
@@ -193,8 +199,16 @@ struct mosquitto_db{
 	struct _mosquitto_auth_plugin auth_plugin;
 	int subscription_count;//总订阅量
 	int retained_count;
+
+	struct _mosquitto_auth_list *waiting_auth_list ;
+	struct _mosquitto_auth_list *finished_auth_list ;
+	pthread_mutex_t auth_list_mutex;
+	pthread_t auth_thread_id ;
 };
 
+
+
+//bridge structs
 enum mqtt3_bridge_direction{
 	bd_out = 0,
 	bd_in = 1,
@@ -292,6 +306,7 @@ int _mosquitto_socket_get_address(int sock, char *buf, int len);
 int mqtt3_packet_handle(struct mosquitto_db *db, struct mosquitto *context);
 int mqtt3_handle_connack(struct mosquitto_db *db, struct mosquitto *context);
 int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context);
+int mqtt3_handle_post_check_unpwd( struct mosquitto_db *db, struct mosquitto *context );//密码校验完成后的部分工作比如离线消息等
 int mqtt3_handle_disconnect(struct mosquitto_db *db, struct mosquitto *context);
 int mqtt3_handle_publish(struct mosquitto_db *db, struct mosquitto *context);
 int mqtt3_handle_subscribe(struct mosquitto_db *db, struct mosquitto *context);
@@ -373,8 +388,11 @@ int mosquitto_security_cleanup_default(struct mosquitto_db *db, bool reload);
 int mosquitto_acl_check_default(struct mosquitto_db *db, struct mosquitto *context, const char *topic, int access);
 int mosquitto_unpwd_check_default(struct mosquitto_db *db, const char *username, const char *password);
 
-/* ============================================================
- * Window service related functions
- * ============================================================ */
+
+
+int auth_thread_init(struct mosquitto_db *db); 
+int auth_thread_destroy(struct mosquitto_db *db);
+void *_mosquitto_auth_thread_main(void *obj);
+
 
 #endif

@@ -119,7 +119,7 @@ int mqtt3_socket_accept(struct mosquitto_db *db, int listensock)
 	if(i==db->context_count){//没有了，重新realloc一个，这个代价很大的。所以建议申请2倍，保留一些空余的,到一定程度的时候每次增加32个也行
 		tmp_contexts = _mosquitto_realloc(db->contexts, sizeof(struct mosquitto*)*(db->context_count+1));
 		if(tmp_contexts){
-			db->context_count++;
+			db->context_count += 1;//暂时改为一次增长32个，不然每次都realloc很恐怖 
 			db->contexts = tmp_contexts;//这样的话，所有人都不能用指向contexts数组某个位置的指针来标识这个连接，比如放到epoll里面去世不行的
 			db->contexts[i] = new_context;
 		}else{

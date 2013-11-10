@@ -8,8 +8,8 @@ else
 all : mosquitto
 endif
 
-mosquitto : mosquitto.o conf.o context.o database.o logging.o loop.o memory_mosq.o persist.o net.o net_mosq.o read_handle.o read_handle_client.o read_handle_server.o read_handle_shared.o security.o security_default.o send_client_mosq.o send_mosq.o send_server.o subs.o sys_tree.o time_mosq.o util_mosq.o will_mosq.o
-	${CC} $^ -o $@ ${LDFLAGS} $(BROKER_LIBS)
+mosquitto : mosquitto.o conf.o auth_thread.o context.o database.o logging.o loop.o memory_mosq.o persist.o net.o net_mosq.o read_handle.o read_handle_client.o read_handle_server.o read_handle_shared.o security.o security_default.o send_client_mosq.o send_mosq.o send_server.o subs.o sys_tree.o time_mosq.o util_mosq.o will_mosq.o
+	${CC} $^ -o $@ ${LDFLAGS} $(BROKER_LIBS) ${LIB_LIBS}
 
 mosquitto.o : mosquitto.c mosquitto_broker.h
 	${CC} $(BROKER_CFLAGS) -c $< -o $@ 
@@ -17,6 +17,9 @@ mosquitto.o : mosquitto.c mosquitto_broker.h
 conf.o : conf.c mosquitto_broker.h
 	${CC} $(BROKER_CFLAGS) -c $< -o $@
 	
+auth_thread.o : auth_thread.c mosquitto_broker.h
+	${CC} $(BROKER_CFLAGS) -c $< -o $@
+
 context.o : context.c mosquitto_broker.h
 	${CC} $(BROKER_CFLAGS) -c $< -o $@
 

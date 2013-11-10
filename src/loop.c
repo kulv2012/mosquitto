@@ -82,6 +82,9 @@ int mosquitto_main_loop(struct mosquitto_db *db, int *listensock, int listensock
 #ifdef WITH_SYS_TREE
 		mqtt3_db_sys_update(db, db->config->sys_interval, start_time);
 #endif
+		if( db->finished_auth_list != NULL){
+			try_wakeup_finished_auth_connections(db);
+		}
 
 		if(listensock_count + db->context_count > pollfd_count){
 			pollfd_count = listensock_count + db->context_count;//申请pollfd数组存储

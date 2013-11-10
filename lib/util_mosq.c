@@ -84,25 +84,34 @@ void _mosquitto_check_keepalive(struct mosquitto *mosq)
 	time_t last_msg_out;
 	time_t last_msg_in;
 	time_t now = mosquitto_time();
+	assert(mosq);
 #ifndef WITH_BROKER
 	int rc;
-#endif
 
-	assert(mosq);
+
 	pthread_mutex_lock(&mosq->msgtime_mutex);
 	last_msg_out = mosq->last_msg_out;
 	last_msg_in = mosq->last_msg_in;
 	pthread_mutex_unlock(&mosq->msgtime_mutex);
+#else
+	last_msg_out = mosq->last_msg_out;
+	last_msg_in = mosq->last_msg_in;
+#endif
 	if(mosq->sock != INVALID_SOCKET &&
 			(now - last_msg_out >= mosq->keepalive || now - last_msg_in >= mosq->keepalive)){
 
 		if(mosq->state == mosq_cs_connected && mosq->ping_t == 0){
 			_mosquitto_send_pingreq(mosq);
 			/* Reset last msg times to give the server time to send a pingresp */
+#ifndef WITH_BROKER
 			pthread_mutex_lock(&mosq->msgtime_mutex);
 			mosq->last_msg_in = now;
 			mosq->last_msg_out = now;
 			pthread_mutex_unlock(&mosq->msgtime_mutex);
+#else 
+			mosq->last_msg_in = now;
+			mosq->last_msg_out = now;
+#endif
 		}else{
 #ifdef WITH_BROKER
 			if(mosq->listener){
