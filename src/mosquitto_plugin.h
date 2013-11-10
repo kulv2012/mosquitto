@@ -166,29 +166,4 @@ int mosquitto_auth_acl_check(void *user_data, const char *clientid, const char *
  * error.
  */
 int mosquitto_auth_unpwd_check(void *user_data, const char *username, const char *password);
-
-/*
- * Function: mosquitto_psk_key_get
- *
- * Called by the broker when a client connects to a listener using TLS/PSK.
- * This is used to retrieve the pre-shared-key associated with a client
- * identity.
- *
- * Examine hint and identity to determine the required PSK (which must be a
- * hexadecimal string with no leading "0x") and copy this string into key.
- *
- * Parameters:
- *	user_data :   the pointer provided in <mosquitto_auth_plugin_init>.
- *	hint :        the psk_hint for the listener the client is connecting to.
- *	identity :    the identity string provided by the client
- *	key :         a string where the hex PSK should be copied
- *	max_key_len : the size of key
- *
- * Return value:
- *	Return 0 on success.
- *	Return >0 on failure.
- *	Return >0 if this function is not required.
- */
-int mosquitto_auth_psk_key_get(void *user_data, const char *hint, const char *identity, char *key, int max_key_len);
-
 #endif

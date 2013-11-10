@@ -43,7 +43,6 @@ typedef int (*FUNC_auth_plugin_security_init)(void *, struct mosquitto_auth_opt 
 typedef int (*FUNC_auth_plugin_security_cleanup)(void *, struct mosquitto_auth_opt *, int, bool);
 typedef int (*FUNC_auth_plugin_acl_check)(void *, const char *, const char *, const char *, int);
 typedef int (*FUNC_auth_plugin_unpwd_check)(void *, const char *, const char *);
-typedef int (*FUNC_auth_plugin_psk_key_get)(void *, const char *, const char *, char *, int);
 
 int mosquitto_security_module_init(struct mosquitto_db *db)
 {
@@ -116,13 +115,6 @@ int mosquitto_security_module_init(struct mosquitto_db *db)
 			return 1;
 		}
 
-		if(!(db->auth_plugin.psk_key_get = (FUNC_auth_plugin_psk_key_get)LIB_SYM(lib, "mosquitto_auth_psk_key_get"))){
-			_mosquitto_log_printf(NULL, MOSQ_LOG_ERR,
-					"Error: Unable to load auth plugin function mosquitto_auth_psk_key_get().");
-			LIB_CLOSE(lib);
-			return 1;
-		}
-
 		db->auth_plugin.lib = lib;
 		db->auth_plugin.user_data = NULL;
 		if(db->auth_plugin.plugin_init){
@@ -141,7 +133,6 @@ int mosquitto_security_module_init(struct mosquitto_db *db)
 		db->auth_plugin.security_cleanup = NULL;
 		db->auth_plugin.acl_check = NULL;
 		db->auth_plugin.unpwd_check = NULL;
-		db->auth_plugin.psk_key_get = NULL;
 	}
 
 	return MOSQ_ERR_SUCCESS;
@@ -167,7 +158,6 @@ int mosquitto_security_module_cleanup(struct mosquitto_db *db)
 	db->auth_plugin.security_cleanup = NULL;
 	db->auth_plugin.acl_check = NULL;
 	db->auth_plugin.unpwd_check = NULL;
-	db->auth_plugin.psk_key_get = NULL;
 
 	return MOSQ_ERR_SUCCESS;
 }
@@ -222,12 +212,4 @@ int mosquitto_unpwd_check(struct mosquitto_db *db, const char *username, const c
 	}
 }
 
-int mosquitto_psk_key_get(struct mosquitto_db *db, const char *hint, const char *identity, char *key, int max_key_len)
-{
-	if(!db->auth_plugin.lib){
-		return mosquitto_psk_key_get_default(db, hint, identity, key, max_key_len);
-	}else{
-		return db->auth_plugin.psk_key_get(db->auth_plugin.user_data, hint, identity, key, max_key_len);
-	}
-}
 

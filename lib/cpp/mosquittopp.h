@@ -94,10 +94,6 @@ class mosqpp_EXPORT mosquittopp {
 		int max_inflight_messages_set(unsigned int max_inflight_messages);
 		void message_retry_set(unsigned int message_retry);
 		void user_data_set(void *userdata);
-		int tls_set(const char *cafile, const char *capath=NULL, const char *certfile=NULL, const char *keyfile=NULL, int (*pw_callback)(char *buf, int size, int rwflag, void *userdata)=NULL);
-		int tls_opts_set(int cert_reqs, const char *tls_version=NULL, const char *ciphers=NULL);
-		int tls_insecure_set(bool value);
-		int tls_psk_set(const char *psk, const char *identity, const char *ciphers=NULL);
 
 		int loop(int timeout=-1, int max_packets=1);
 		int loop_misc();

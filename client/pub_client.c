@@ -272,14 +272,6 @@ int main(int argc, char *argv[])
 	char *will_topic = NULL;
 
 	bool insecure = false;
-	char *cafile = NULL;
-	char *capath = NULL;
-	char *certfile = NULL;
-	char *keyfile = NULL;
-	char *tls_version = NULL;
-
-	char *psk = NULL;
-	char *psk_identity = NULL;
 
 	for(i=1; i<argc; i++){
 		if(!strcmp(argv[i], "-p") || !strcmp(argv[i], "--port")){
@@ -303,33 +295,6 @@ int main(int argc, char *argv[])
 				return 1;
 			}else{
 				bind_address = argv[i+1];
-			}
-			i++;
-		}else if(!strcmp(argv[i], "--cafile")){
-			if(i==argc-1){
-				fprintf(stderr, "Error: --cafile argument given but no file specified.\n\n");
-				print_usage();
-				return 1;
-			}else{
-				cafile = argv[i+1];
-			}
-			i++;
-		}else if(!strcmp(argv[i], "--capath")){
-			if(i==argc-1){
-				fprintf(stderr, "Error: --capath argument given but no directory specified.\n\n");
-				print_usage();
-				return 1;
-			}else{
-				capath = argv[i+1];
-			}
-			i++;
-		}else if(!strcmp(argv[i], "--cert")){
-			if(i==argc-1){
-				fprintf(stderr, "Error: --cert argument given but no file specified.\n\n");
-				print_usage();
-				return 1;
-			}else{
-				certfile = argv[i+1];
 			}
 			i++;
 		}else if(!strcmp(argv[i], "-d") || !strcmp(argv[i], "--debug")){
@@ -389,15 +354,6 @@ int main(int argc, char *argv[])
 				id_prefix = argv[i+1];
 			}
 			i++;
-		}else if(!strcmp(argv[i], "--key")){
-			if(i==argc-1){
-				fprintf(stderr, "Error: --key argument given but no file specified.\n\n");
-				print_usage();
-				return 1;
-			}else{
-				keyfile = argv[i+1];
-			}
-			i++;
 		}else if(!strcmp(argv[i], "-l") || !strcmp(argv[i], "--stdin-line")){
 			if(mode != MSGMODE_NONE){
 				fprintf(stderr, "Error: Only one type of message can be sent at once.\n\n");
@@ -438,23 +394,6 @@ int main(int argc, char *argv[])
 			}else{
 				mode = MSGMODE_NULL;
 			}
-		}else if(!strcmp(argv[i], "--psk")){
-			if(i==argc-1){
-				fprintf(stderr, "Error: --psk argument given but no key specified.\n\n");
-				print_usage();
-				return 1;
-			}else{
-				psk = argv[i+1];
-			}
-			i++;
-		}else if(!strcmp(argv[i], "--psk-identity")){
-			if(i==argc-1){
-				fprintf(stderr, "Error: --psk-identity argument given but no identity specified.\n\n");
-				print_usage();
-				return 1;
-			}else{
-				psk_identity = argv[i+1];
-			}
 			i++;
 		}else if(!strcmp(argv[i], "-q") || !strcmp(argv[i], "--qos")){
 			if(i==argc-1){
@@ -489,15 +428,6 @@ int main(int argc, char *argv[])
 				return 1;
 			}else{
 				topic = argv[i+1];
-			}
-			i++;
-		}else if(!strcmp(argv[i], "--tls-version")){
-			if(i==argc-1){
-				fprintf(stderr, "Error: --tls-version argument given but no version specified.\n\n");
-				print_usage();
-				return 1;
-			}else{
-				tls_version = argv[i+1];
 			}
 			i++;
 		}else if(!strcmp(argv[i], "-u") || !strcmp(argv[i], "--username")){
@@ -578,19 +508,6 @@ int main(int argc, char *argv[])
 	if(password && !username){
 		if(!quiet) fprintf(stderr, "Warning: Not using password since username not set.\n");
 	}
-	if((certfile && !keyfile) || (keyfile && !certfile)){
-		fprintf(stderr, "Error: Both certfile and keyfile must be provided if one of them is.\n");
-		print_usage();
-		return 1;
-	}
-	if((cafile || capath) && psk){
-		if(!quiet) fprintf(stderr, "Error: Only one of --psk or --cafile/--capath may be used at once.\n");
-		return 1;
-	}
-	if(psk && !psk_identity){
-		if(!quiet) fprintf(stderr, "Error: --psk-identity required if --psk used.\n");
-		return 1;
-	}
 
 	mosquitto_lib_init();
 
@@ -643,26 +560,6 @@ int main(int argc, char *argv[])
 	}
 	if(username && mosquitto_username_pw_set(mosq, username, password)){
 		if(!quiet) fprintf(stderr, "Error: Problem setting username and password.\n");
-		mosquitto_lib_cleanup();
-		return 1;
-	}
-	if((cafile || capath) && mosquitto_tls_set(mosq, cafile, capath, certfile, keyfile, NULL)){
-		if(!quiet) fprintf(stderr, "Error: Problem setting TLS options.\n");
-		mosquitto_lib_cleanup();
-		return 1;
-	}
-	if(insecure && mosquitto_tls_insecure_set(mosq, true)){
-		if(!quiet) fprintf(stderr, "Error: Problem setting TLS insecure option.\n");
-		mosquitto_lib_cleanup();
-		return 1;
-	}
-	if(psk && mosquitto_tls_psk_set(mosq, psk, psk_identity, NULL)){
-		if(!quiet) fprintf(stderr, "Error: Problem setting TLS-PSK options.\n");
-		mosquitto_lib_cleanup();
-		return 1;
-	}
-	if(tls_version && mosquitto_tls_opts_set(mosq, 1, tls_version, NULL)){
-		if(!quiet) fprintf(stderr, "Error: Problem setting TLS options.\n");
 		mosquitto_lib_cleanup();
 		return 1;
 	}

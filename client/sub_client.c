@@ -178,16 +178,6 @@ int main(int argc, char *argv[])
 	bool will_retain = false;
 	char *will_topic = NULL;
 
-	bool insecure = false;
-	char *cafile = NULL;
-	char *capath = NULL;
-	char *certfile = NULL;
-	char *keyfile = NULL;
-	char *tls_version = NULL;
-
-	char *psk = NULL;
-	char *psk_identity = NULL;
-
 	memset(&ud, 0, sizeof(struct userdata));
 
 	for(i=1; i<argc; i++){
@@ -216,33 +206,6 @@ int main(int argc, char *argv[])
 			i++;
 		}else if(!strcmp(argv[i], "-c") || !strcmp(argv[i], "--disable-clean-session")){
 			clean_session = false;
-		}else if(!strcmp(argv[i], "--cafile")){
-			if(i==argc-1){
-				fprintf(stderr, "Error: --cafile argument given but no file specified.\n\n");
-				print_usage();
-				return 1;
-			}else{
-				cafile = argv[i+1];
-			}
-			i++;
-		}else if(!strcmp(argv[i], "--capath")){
-			if(i==argc-1){
-				fprintf(stderr, "Error: --capath argument given but no directory specified.\n\n");
-				print_usage();
-				return 1;
-			}else{
-				capath = argv[i+1];
-			}
-			i++;
-		}else if(!strcmp(argv[i], "--cert")){
-			if(i==argc-1){
-				fprintf(stderr, "Error: --cert argument given but no file specified.\n\n");
-				print_usage();
-				return 1;
-			}else{
-				certfile = argv[i+1];
-			}
-			i++;
 		}else if(!strcmp(argv[i], "-d") || !strcmp(argv[i], "--debug")){
 			debug = true;
 		}else if(!strcmp(argv[i], "--help")){
@@ -257,8 +220,6 @@ int main(int argc, char *argv[])
 				host = argv[i+1];
 			}
 			i++;
-		}else if(!strcmp(argv[i], "--insecure")){
-			insecure = true;
 		}else if(!strcmp(argv[i], "-i") || !strcmp(argv[i], "--id")){
 			if(id_prefix){
 				fprintf(stderr, "Error: -i and -I argument cannot be used together.\n\n");
@@ -301,33 +262,6 @@ int main(int argc, char *argv[])
 				}
 			}
 			i++;
-		}else if(!strcmp(argv[i], "--key")){
-			if(i==argc-1){
-				fprintf(stderr, "Error: --key argument given but no file specified.\n\n");
-				print_usage();
-				return 1;
-			}else{
-				keyfile = argv[i+1];
-			}
-			i++;
-		}else if(!strcmp(argv[i], "--psk")){
-			if(i==argc-1){
-				fprintf(stderr, "Error: --psk argument given but no key specified.\n\n");
-				print_usage();
-				return 1;
-			}else{
-				psk = argv[i+1];
-			}
-			i++;
-		}else if(!strcmp(argv[i], "--psk-identity")){
-			if(i==argc-1){
-				fprintf(stderr, "Error: --psk-identity argument given but no identity specified.\n\n");
-				print_usage();
-				return 1;
-			}else{
-				psk_identity = argv[i+1];
-			}
-			i++;
 		}else if(!strcmp(argv[i], "-q") || !strcmp(argv[i], "--qos")){
 			if(i==argc-1){
 				fprintf(stderr, "Error: -q argument given but no QoS specified.\n\n");
@@ -355,15 +289,6 @@ int main(int argc, char *argv[])
 				ud.topic_count++;
 				ud.topics = realloc(ud.topics, ud.topic_count*sizeof(char *));
 				ud.topics[ud.topic_count-1] = argv[i+1];
-			}
-			i++;
-		}else if(!strcmp(argv[i], "--tls-version")){
-			if(i==argc-1){
-				fprintf(stderr, "Error: --tls-version argument given but no version specified.\n\n");
-				print_usage();
-				return 1;
-			}else{
-				tls_version = argv[i+1];
 			}
 			i++;
 		}else if(!strcmp(argv[i], "-u") || !strcmp(argv[i], "--username")){
@@ -450,19 +375,6 @@ int main(int argc, char *argv[])
 	if(ud.password && !ud.username){
 		if(!ud.quiet) fprintf(stderr, "Warning: Not using password since username not set.\n");
 	}
-	if((certfile && !keyfile) || (keyfile && !certfile)){
-		fprintf(stderr, "Error: Both certfile and keyfile must be provided if one of them is.\n");
-		print_usage();
-		return 1;
-	}
-	if((cafile || capath) && psk){
-		if(!ud.quiet) fprintf(stderr, "Error: Only one of --psk or --cafile/--capath may be used at once.\n");
-		return 1;
-	}
-	if(psk && !psk_identity){
-		if(!ud.quiet) fprintf(stderr, "Error: --psk-identity required if --psk used.\n");
-		return 1;
-	}
 
 	mosquitto_lib_init();
 
@@ -515,26 +427,6 @@ int main(int argc, char *argv[])
 	}
 	if(ud.username && mosquitto_username_pw_set(mosq, ud.username, ud.password)){
 		if(!ud.quiet) fprintf(stderr, "Error: Problem setting username and password.\n");
-		mosquitto_lib_cleanup();
-		return 1;
-	}
-	if((cafile || capath) && mosquitto_tls_set(mosq, cafile, capath, certfile, keyfile, NULL)){
-		if(!ud.quiet) fprintf(stderr, "Error: Problem setting TLS options.\n");
-		mosquitto_lib_cleanup();
-		return 1;
-	}
-	if(insecure && mosquitto_tls_insecure_set(mosq, true)){
-		if(!ud.quiet) fprintf(stderr, "Error: Problem setting TLS insecure option.\n");
-		mosquitto_lib_cleanup();
-		return 1;
-	}
-	if(psk && mosquitto_tls_psk_set(mosq, psk, psk_identity, NULL)){
-		if(!ud.quiet) fprintf(stderr, "Error: Problem setting TLS-PSK options.\n");
-		mosquitto_lib_cleanup();
-		return 1;
-	}
-	if(tls_version && mosquitto_tls_opts_set(mosq, 1, tls_version, NULL)){
-		if(!ud.quiet) fprintf(stderr, "Error: Problem setting TLS options.\n");
 		mosquitto_lib_cleanup();
 		return 1;
 	}

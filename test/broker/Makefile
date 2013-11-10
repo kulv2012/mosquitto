@@ -9,7 +9,7 @@ clean :
 test-compile : 
 
 
-test : test-compile 01 02 03 04 05 06 07 08 09 10
+test : test-compile 01 02 03 04 05 06 07 09 10
 
 01 :
 	./01-connect-success.py
@@ -65,20 +65,6 @@ test : test-compile 01 02 03 04 05 06 07 08 09 10
 	./07-will-null.py
 	./07-will-acl-denied.py
 	./07-will-null-topic.py
-
-08 :
-	./08-ssl-connect-no-auth.py
-	./08-ssl-connect-no-auth-wrong-ca.py
-	./08-ssl-connect-cert-auth.py
-	./08-ssl-connect-cert-auth-without.py
-	./08-ssl-connect-cert-auth-expired.py
-	./08-ssl-connect-cert-auth-revoked.py
-	./08-ssl-connect-cert-auth-crl.py
-	./08-ssl-connect-identity.py
-	./08-ssl-connect-no-identity.py
-	./08-ssl-bridge.py
-	./08-tls-psk-pub.py
-	./08-tls-psk-bridge.py
 
 09 :
 	./09-plugin-auth-unpwd-success.py

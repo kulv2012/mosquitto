@@ -551,29 +551,7 @@ int mosquitto_unsubscribe(struct mosquitto *mosq, int *mid, const char *sub)
 	return _mosquitto_send_unsubscribe(mosq, mid, false, sub);
 }
 
-int mosquitto_tls_set(struct mosquitto *mosq, const char *cafile, const char *capath, const char *certfile, const char *keyfile, int (*pw_callback)(char *buf, int size, int rwflag, void *userdata))
-{
-	return MOSQ_ERR_NOT_SUPPORTED;
 
-}
-
-int mosquitto_tls_opts_set(struct mosquitto *mosq, int cert_reqs, const char *tls_version, const char *ciphers)
-{
-	return MOSQ_ERR_NOT_SUPPORTED;
-
-}
-
-
-int mosquitto_tls_insecure_set(struct mosquitto *mosq, bool value)
-{
-	return MOSQ_ERR_NOT_SUPPORTED;
-}
-
-
-int mosquitto_tls_psk_set(struct mosquitto *mosq, const char *psk, const char *identity, const char *ciphers)
-{
-	return MOSQ_ERR_NOT_SUPPORTED;
-}
 
 
 int mosquitto_loop(struct mosquitto *mosq, int timeout, int max_packets)

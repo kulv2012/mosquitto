@@ -88,7 +88,6 @@ struct mqtt3_config {
 	char *persistence_filepath;
 	time_t persistent_client_expiration;
 	char *pid_file;
-	char *psk_file;
 	bool queue_qos0_messages;//如果客户端挂了，qos0的消息是否保存离线记录
 	int retry_interval;
 	int store_clean_interval;
@@ -168,7 +167,6 @@ struct _mosquitto_auth_plugin{
 	int (*security_cleanup)(void *user_data, struct mosquitto_auth_opt *auth_opts, int auth_opt_count, bool reload);
 	int (*acl_check)(void *user_data, const char *clientid, const char *username, const char *topic, int access);
 	int (*unpwd_check)(void *user_data, const char *username, const char *password);
-	int (*psk_key_get)(void *user_data, const char *hint, const char *identity, char *key, int max_key_len);
 };
 
 struct _clientid_index_hash{
@@ -185,7 +183,6 @@ struct mosquitto_db{
 	struct _mosquitto_unpwd *unpwd;
 	struct _mosquitto_acl_user *acl_list;
 	struct _mosquitto_acl *acl_patterns;
-	struct _mosquitto_unpwd *psk_id;
 	struct mosquitto **contexts;//注意这个地方会不断变化，所以不要指向这个数组
 	struct _clientid_index_hash *clientid_index_hash;//所有客户端id的哈希表,用来快速找到这个客户端在db->contexts数组中的位置的
 	int context_count;
@@ -369,14 +366,12 @@ int mosquitto_security_apply(struct mosquitto_db *db);
 int mosquitto_security_cleanup(struct mosquitto_db *db, bool reload);
 int mosquitto_acl_check(struct mosquitto_db *db, struct mosquitto *context, const char *topic, int access);
 int mosquitto_unpwd_check(struct mosquitto_db *db, const char *username, const char *password);
-int mosquitto_psk_key_get(struct mosquitto_db *db, const char *hint, const char *identity, char *key, int max_key_len);
 
 int mosquitto_security_init_default(struct mosquitto_db *db, bool reload);
 int mosquitto_security_apply_default(struct mosquitto_db *db);
 int mosquitto_security_cleanup_default(struct mosquitto_db *db, bool reload);
 int mosquitto_acl_check_default(struct mosquitto_db *db, struct mosquitto *context, const char *topic, int access);
 int mosquitto_unpwd_check_default(struct mosquitto_db *db, const char *username, const char *password);
-int mosquitto_psk_key_get_default(struct mosquitto_db *db, const char *hint, const char *identity, char *key, int max_key_len);
 
 /* ============================================================
  * Window service related functions

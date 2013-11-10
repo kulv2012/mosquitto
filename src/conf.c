@@ -125,8 +125,6 @@ static void _config_init_reload(struct mqtt3_config *config)
 	if(config->persistence_file) _mosquitto_free(config->persistence_file);
 	config->persistence_file = NULL;
 	config->persistent_client_expiration = 0;
-	if(config->psk_file) _mosquitto_free(config->psk_file);
-	config->psk_file = NULL;
 	config->queue_qos0_messages = false;
 	config->retry_interval = 20;
 	config->store_clean_interval = 10;
@@ -176,7 +174,6 @@ void mqtt3_config_cleanup(struct mqtt3_config *config)
 	if(config->persistence_location) _mosquitto_free(config->persistence_location);
 	if(config->persistence_file) _mosquitto_free(config->persistence_file);
 	if(config->persistence_filepath) _mosquitto_free(config->persistence_filepath);
-	if(config->psk_file) _mosquitto_free(config->psk_file);
 	if(config->listeners){
 		for(i=0; i<config->listener_count; i++){
 			if(config->listeners[i].host) _mosquitto_free(config->listeners[i].host);
@@ -491,10 +488,6 @@ int _config_read_file(struct mqtt3_config *config, bool reload, const char *file
 					_mosquitto_log_printf(NULL, MOSQ_LOG_WARNING, "Warning: Bridge and/or TLS-PSK support not available.");
 				}else if(!strcmp(token, "bridge_keyfile")){
 					_mosquitto_log_printf(NULL, MOSQ_LOG_WARNING, "Warning: Bridge and/or TLS support not available.");
-				}else if(!strcmp(token, "bridge_psk")){
-					_mosquitto_log_printf(NULL, MOSQ_LOG_WARNING, "Warning: Bridge and/or TLS-PSK support not available.");
-				}else if(!strcmp(token, "bridge_tls_version")){
-					_mosquitto_log_printf(NULL, MOSQ_LOG_WARNING, "Warning: Bridge and/or TLS support not available.");
 				}else if(!strcmp(token, "cafile")){
 					_mosquitto_log_printf(NULL, MOSQ_LOG_WARNING, "Warning: TLS support not available.");
 				}else if(!strcmp(token, "capath")){
@@ -766,10 +759,6 @@ int _config_read_file(struct mqtt3_config *config, bool reload, const char *file
 						return MOSQ_ERR_INVAL;
 					}
 					config->default_listener.port = port_tmp;
-				}else if(!strcmp(token, "psk_file")){
-					_mosquitto_log_printf(NULL, MOSQ_LOG_WARNING, "Warning: TLS/TLS-PSK support not available.");
-				}else if(!strcmp(token, "psk_hint")){
-					_mosquitto_log_printf(NULL, MOSQ_LOG_WARNING, "Warning: TLS/TLS-PSK support not available.");
 				}else if(!strcmp(token, "queue_qos0_messages")){
 					if(_conf_parse_bool(&token, token, &config->queue_qos0_messages, saveptr)) return MOSQ_ERR_INVAL;
 				}else if(!strcmp(token, "require_certificate")){
@@ -800,8 +789,6 @@ int _config_read_file(struct mqtt3_config *config, bool reload, const char *file
 					}
 				}else if(!strcmp(token, "threshold")){
 					_mosquitto_log_printf(NULL, MOSQ_LOG_WARNING, "Warning: Bridge support not available.");
-				}else if(!strcmp(token, "tls_version")){
-					_mosquitto_log_printf(NULL, MOSQ_LOG_WARNING, "Warning: TLS support not available.");
 				}else if(!strcmp(token, "topic")){
 					_mosquitto_log_printf(NULL, MOSQ_LOG_WARNING, "Warning: Bridge support not available.");
 				}else if(!strcmp(token, "try_private")){
