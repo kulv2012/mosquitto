@@ -306,6 +306,7 @@ int _mosquitto_socket_get_address(int sock, char *buf, int len);
 int mqtt3_packet_handle(struct mosquitto_db *db, struct mosquitto *context);
 int mqtt3_handle_connack(struct mosquitto_db *db, struct mosquitto *context);
 int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context);
+int try_wakeup_finished_auth_connections( struct mosquitto_db *db ) ;
 int mqtt3_handle_post_check_unpwd( struct mosquitto_db *db, struct mosquitto *context );//密码校验完成后的部分工作比如离线消息等
 int mqtt3_handle_disconnect(struct mosquitto_db *db, struct mosquitto *context);
 int mqtt3_handle_publish(struct mosquitto_db *db, struct mosquitto *context);

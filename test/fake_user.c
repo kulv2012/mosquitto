@@ -41,7 +41,7 @@ void my_connect_callback(struct mosquitto *mosq, void *obj, int result)
 	char topic[100];
 
 	if(!result){//随机订阅一个topic
-		snprintf(topic, 100, "fake/%d", getpid()%100);
+		snprintf(topic, 100, "fake/%d", rand()%0100);
 		mosquitto_subscribe(mosq, NULL, topic, rand()%3);
 	}
 	printf("my_connect_callback, result[%d]\n", result);
@@ -86,27 +86,27 @@ int main(int argc, char *argv[])
 	snprintf(id, 30, "fake_user_%d", pid);
 
 	mosquitto_lib_init();
-	mosq = mosquitto_new(id, clean_session, NULL);
-	if(!mosq){
-		fprintf(stderr, "Error: Out of memory.\n");
-		return 1;
-	}
-
-	if(rand()%5 == 0){
-		snprintf(will_topic, 100, "fake/wills/%d", rand()%100);
-		if(mosquitto_will_set(mosq, will_topic, will_payloadlen, will_payload, will_qos, will_retain)){
-			fprintf(stderr, "Error: Problem setting will.\n");
-			return 1;
-		}
-	}
-	mosquitto_connect_callback_set(mosq, my_connect_callback);
-	mosquitto_subscribe_callback_set(mosq, my_subscribe_callback) ;
-	mosquitto_message_callback_set(mosq, my_message_callback) ;
 	while(1){
 		//clean_session = rand()%10==0?false:true;
+		snprintf(username, 31, "username_%d", rand()%10000 ) ;//模拟1000个人
+		snprintf(password, 31, "password_%d", rand()%10000 ) ;
+		mosq = mosquitto_new(username, clean_session, NULL);
+		if(!mosq){
+			fprintf(stderr, "Error: Out of memory.\n");
+			return 1;
+		}
 
-		snprintf(username, 31, "username_%d", rand()%10 ) ;
-		snprintf(password, 31, "password_%d", rand()%10 ) ;
+		if(rand()%5 == 0){
+			snprintf(will_topic, 100, "fake/wills/%d", rand()%100);
+			if(mosquitto_will_set(mosq, will_topic, will_payloadlen, will_payload, will_qos, will_retain)){
+				fprintf(stderr, "Error: Problem setting will.\n");
+				return 1;
+			}
+		}
+		mosquitto_connect_callback_set(mosq, my_connect_callback);
+		mosquitto_subscribe_callback_set(mosq, my_subscribe_callback) ;
+		mosquitto_message_callback_set(mosq, my_message_callback) ;
+
 		mosquitto_username_pw_set(mosq, username, password) ;
 
 		if(mosquitto_connect(mosq, host, port, keepalive)){
@@ -117,7 +117,7 @@ int main(int argc, char *argv[])
 
 		while(!mosquitto_loop(mosq, 1, 5)){
 			if(rand()%100==0){
-				snprintf(topic, 100, "fake/%d", rand()%100);
+				snprintf(topic, 100, "fake/%d", rand()%1000);
 				mosquitto_publish(mosq, NULL, topic, 10, "0123456789", rand()%3, rand()%2);
 				printf("mosquitto_publish:%s = %s\n", topic, "0123456789");
 			}
@@ -128,8 +128,8 @@ int main(int argc, char *argv[])
 		}
 		printf("while-end,mosquitto_connect again\n");
 		//sleep(10);
+		mosquitto_destroy(mosq);
 	}
-	mosquitto_destroy(mosq);
 	mosquitto_lib_cleanup();
 
 	return 0;

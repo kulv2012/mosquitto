@@ -48,7 +48,7 @@ def on_log(mosq, obj, level, string):
     print(string)
 
 # If you want to use a specific client id, use
-mqttc = mosquitto.Mosquitto("kulvsub.py")
+mqttc = mosquitto.Mosquitto("publish.py")
 # but note that the client id must be unique on the broker. Leaving the client
 # id parameter empty will generate a random id for you.
 mqttc = mosquitto.Mosquitto()
@@ -59,7 +59,7 @@ mqttc.on_subscribe = on_subscribe
 # Uncomment to enable debug messages
 #mqttc.on_log = on_log
 
-mqttc.username_pw_set("28946468", "fenger");
+mqttc.username_pw_set("28946467", "xxxx");
 mqttc.connect("211.151.86.220", 1883, 60)
 
 msg = "abc"+ str(random.randint(1, 10000000000));
