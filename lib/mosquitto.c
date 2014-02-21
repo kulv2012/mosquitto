@@ -568,6 +568,8 @@ int mosquitto_loop(struct mosquitto *mosq, int timeout, int max_packets)
 	if(!mosq || max_packets < 1) return MOSQ_ERR_INVAL;
 	if(mosq->sock == INVALID_SOCKET) return MOSQ_ERR_NO_CONN;
 
+	memset(&readfds, 0, sizeof(fd_set)) ;
+	memset(&writefds, 0, sizeof(fd_set)) ;
 	FD_ZERO(&readfds);
 	FD_SET(mosq->sock, &readfds);
 	FD_ZERO(&writefds);

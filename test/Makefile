@@ -8,7 +8,7 @@ SOVERSION=1
 
 .PHONY: all test clean reallyclean
 
-all : fake_user msgsps_pub msgsps_sub 
+all : fake_user msgsps_pub msgsps_sub connection_keeper
 #packet-gen qos
 
 test :
@@ -20,6 +20,13 @@ fake_user : fake_user.o
 	#${CC} $^ -o $@ -lmosquitto
 
 fake_user.o : fake_user.c
+	${CC} $(CFLAGS) -c $< -o $@
+
+connection_keeper : connection_keeper.o
+	${CC} $^ -o $@ ../lib/libmosquitto.so.${SOVERSION}
+	#${CC} $^ -o $@ -lmosquitto
+
+connection_keeper.o : connection_keeper.c
 	${CC} $(CFLAGS) -c $< -o $@
 
 msgsps_pub : msgsps_pub.o
