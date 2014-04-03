@@ -31,7 +31,7 @@
 import mosquitto
 
 def on_connect(mosq, obj, rc):
-    mosq.subscribe("$SYS/#", 0)
+    #mosq.subscribe("$SYS/#", 0)
     mosq.subscribe("tokudu/kulvsub", 0)
     print("rc: "+str(rc))
 

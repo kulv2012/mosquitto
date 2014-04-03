@@ -254,6 +254,7 @@ _db_subs_retain_write	./src/persist.c	/^static int _db_subs_retain_write(struct 
 _free_acl	./src/security_default.c	/^static void _free_acl(struct _mosquitto_acl *acl)$/;"	f	file:
 _mosquitto_acl	./src/mosquitto_broker.h	/^struct _mosquitto_acl{$/;"	s
 _mosquitto_acl_user	./src/mosquitto_broker.h	/^struct _mosquitto_acl_user{$/;"	s
+_mosquitto_auth_list	./src/mosquitto_broker.h	/^struct _mosquitto_auth_list{$/;"	s
 _mosquitto_auth_plugin	./src/mosquitto_broker.h	/^struct _mosquitto_auth_plugin{$/;"	s
 _mosquitto_auth_thread_main	./src/auth_thread.c	/^void *_mosquitto_auth_thread_main(void *obj){$/;"	f
 _mosquitto_calloc	./lib/memory_mosq.c	/^void *_mosquitto_calloc(size_t nmemb, size_t size)$/;"	f
@@ -329,7 +330,6 @@ _mosquitto_thread_main	./lib/thread_mosq.c	/^void *_mosquitto_thread_main(void *
 _mosquitto_topic_wildcard_len_check	./lib/util_mosq.c	/^int _mosquitto_topic_wildcard_len_check(const char *str)$/;"	f
 _mosquitto_try_connect	./lib/net_mosq.c	/^int _mosquitto_try_connect(const char *host, uint16_t port, int *sock, const char *bind_address, bool blocking)$/;"	f
 _mosquitto_unpwd	./src/mosquitto_broker.h	/^struct _mosquitto_unpwd{$/;"	s
-_mosquitto_waiting_auth_list	./src/mosquitto_broker.h	/^struct _mosquitto_waiting_auth_list{$/;"	s
 _mosquitto_will_clear	./lib/will_mosq.c	/^int _mosquitto_will_clear(struct mosquitto *mosq)$/;"	f
 _mosquitto_will_set	./lib/will_mosq.c	/^int _mosquitto_will_set(struct mosquitto *mosq, const char *topic, int payloadlen, const void *payload, int qos, bool retain)$/;"	f
 _mosquitto_write_byte	./lib/net_mosq.c	/^void _mosquitto_write_byte(struct _mosquitto_packet *packet, uint8_t byte)$/;"	f
@@ -366,6 +366,7 @@ address_count	./src/mosquitto_broker.h	/^	int address_count;$/;"	m	struct:_mqtt3
 addresses	./src/mosquitto_broker.h	/^	struct bridge_address *addresses;$/;"	m	struct:_mqtt3_bridge	typeref:struct:_mqtt3_bridge::bridge_address
 allow_anonymous	./src/mosquitto_broker.h	/^	bool allow_anonymous;\/\/是否允许免密码登陆使用$/;"	m	struct:mqtt3_config
 allow_duplicate_messages	./src/mosquitto_broker.h	/^	bool allow_duplicate_messages;$/;"	m	struct:mqtt3_config
+auth_list_mutex	./src/mosquitto_broker.h	/^	pthread_mutex_t auth_list_mutex;$/;"	m	struct:mosquitto_db
 auth_option_count	./src/mosquitto_broker.h	/^	int auth_option_count;$/;"	m	struct:mqtt3_config
 auth_options	./src/mosquitto_broker.h	/^	struct mosquitto_auth_opt *auth_options;$/;"	m	struct:mqtt3_config	typeref:struct:mqtt3_config::mosquitto_auth_opt
 auth_plugin	./src/mosquitto_broker.h	/^	char *auth_plugin;$/;"	m	struct:mqtt3_config
@@ -409,9 +410,9 @@ config_recurse	./src/conf.c	/^struct config_recurse {$/;"	s	file:
 connect_callback	./examples/mysql_log/mysql_log.c	/^void connect_callback(struct mosquitto *mosq, void *obj, int result)$/;"	f
 connected	./client/pub_client.c	/^static bool connected = true;$/;"	v	file:
 connection_messages	./src/mosquitto_broker.h	/^	bool connection_messages;$/;"	m	struct:mqtt3_config
-context	./src/mosquitto_broker.h	/^	struct mosquitto *context ;$/;"	m	struct:_mosquitto_waiting_auth_list	typeref:struct:_mosquitto_waiting_auth_list::mosquitto
+context	./src/mosquitto_broker.h	/^	struct mosquitto *context ;$/;"	m	struct:_mosquitto_auth_list	typeref:struct:_mosquitto_auth_list::mosquitto
 context	./src/mosquitto_broker.h	/^	struct mosquitto *context;\/\/指向订阅的客户端连接，$/;"	m	struct:_mosquitto_subleaf	typeref:struct:_mosquitto_subleaf::mosquitto
-context_count	./src/mosquitto_broker.h	/^	int context_count;$/;"	m	struct:mosquitto_db
+context_count	./src/mosquitto_broker.h	/^	int context_count;\/\/contexts数组的总长度，不是实际长度$/;"	m	struct:mosquitto_db
 contexts	./src/mosquitto_broker.h	/^	struct mosquitto **contexts;\/\/注意这个地方会不断变化，所以不要指向这个数组$/;"	m	struct:mosquitto_db	typeref:struct:mosquitto_db::mosquitto
 copy_contents	./src/mosquitto_passwd.c	/^int copy_contents(FILE *src, FILE *dest)$/;"	f
 count	./src/uthash.h	/^   unsigned count;$/;"	m	struct:UT_hash_bucket
@@ -448,6 +449,7 @@ dup	./lib/mosquitto_internal.h	/^	bool dup;$/;"	m	struct:mosquitto_message_all
 dup	./src/mosquitto_broker.h	/^	bool dup;$/;"	m	struct:mosquitto_client_msg
 expand_mult	./src/uthash.h	/^   unsigned expand_mult;$/;"	m	struct:UT_hash_bucket
 fd	./src/mosquitto_broker.h	/^	int fd;$/;"	m	struct:_mqtt3_listener
+finished_auth_list	./src/mosquitto_broker.h	/^	struct _mosquitto_auth_list *finished_auth_list ;$/;"	m	struct:mosquitto_db	typeref:struct:mosquitto_db::_mosquitto_auth_list
 first_connection	./test/lib/c/03-publish-c2b-qos1-disconnect.c	/^static int first_connection = 1;$/;"	v	file:
 first_connection	./test/lib/c/03-publish-c2b-qos2-disconnect.c	/^static int first_connection = 1;$/;"	v	file:
 flag_db_backup	./src/mosquitto.c	/^bool flag_db_backup = false;$/;"	v
@@ -596,8 +598,6 @@ mid	./src/mosquitto_broker.h	/^	uint16_t mid;$/;"	m	struct:mosquitto_client_msg
 mid	./test/qos.c	/^	uint16_t mid;$/;"	m	struct:sub	file:
 mid_sent	./client/pub_client.c	/^static int mid_sent = 0;$/;"	v	file:
 mode	./client/pub_client.c	/^static int mode = MSGMODE_NONE;$/;"	v	file:
-mosq_cs_authorized	./lib/mosquitto_internal.h	/^	mosq_cs_authorized,\/\/验证完成$/;"	e	enum:mosquitto_client_state
-mosq_cs_authorizing	./lib/mosquitto_internal.h	/^	mosq_cs_authorizing,\/\/正在等待验证$/;"	e	enum:mosquitto_client_state
 mosq_cs_connect_async	./lib/mosquitto_internal.h	/^	mosq_cs_connect_async,$/;"	e	enum:mosquitto_client_state
 mosq_cs_connect_pending	./lib/mosquitto_internal.h	/^	mosq_cs_connect_pending$/;"	e	enum:mosquitto_client_state
 mosq_cs_connected	./lib/mosquitto_internal.h	/^	mosq_cs_connected ,$/;"	e	enum:mosquitto_client_state
@@ -733,12 +733,12 @@ mqtt3_handle_connack	./src/read_handle_client.c	/^int mqtt3_handle_connack(struc
 mqtt3_handle_connect	./src/read_handle_server.c	/^int mqtt3_handle_connect(struct mosquitto_db *db, struct mosquitto *context)$/;"	f
 mqtt3_handle_disconnect	./src/read_handle_server.c	/^int mqtt3_handle_disconnect(struct mosquitto_db *db, struct mosquitto *context)$/;"	f
 mqtt3_handle_post_check_unpwd	./src/read_handle_server.c	/^int mqtt3_handle_post_check_unpwd( struct mosquitto_db *db, struct mosquitto *context ){$/;"	f
-mqtt3_handle_publish	./src/read_handle.c	/^int mqtt3_handle_publish(struct mosquitto_db *db, struct mosquitto *context)$/;"	f
+mqtt3_handle_publish	./src/read_handle_server.c	/^int mqtt3_handle_publish(struct mosquitto_db *db, struct mosquitto *context)$/;"	f
 mqtt3_handle_subscribe	./src/read_handle_server.c	/^int mqtt3_handle_subscribe(struct mosquitto_db *db, struct mosquitto *context)$/;"	f
 mqtt3_handle_unsubscribe	./src/read_handle_server.c	/^int mqtt3_handle_unsubscribe(struct mosquitto_db *db, struct mosquitto *context)$/;"	f
 mqtt3_log_close	./src/logging.c	/^int mqtt3_log_close(void)$/;"	f
 mqtt3_log_init	./src/logging.c	/^int mqtt3_log_init(int priorities, int destinations)$/;"	f
-mqtt3_packet_handle	./src/read_handle.c	/^int mqtt3_packet_handle(struct mosquitto_db *db, struct mosquitto *context)$/;"	f
+mqtt3_packet_handle	./src/read_handle_server.c	/^int mqtt3_packet_handle(struct mosquitto_db *db, struct mosquitto *context)$/;"	f
 mqtt3_retain_queue	./src/subs.c	/^int mqtt3_retain_queue(struct mosquitto_db *db, struct mosquitto *context, const char *sub, int sub_qos)$/;"	f
 mqtt3_socket_accept	./src/net.c	/^int mqtt3_socket_accept(struct mosquitto_db *db, int listensock)$/;"	f
 mqtt3_socket_listen	./src/net.c	/^int mqtt3_socket_listen(struct _mqtt3_listener *listener)$/;"	f
@@ -780,9 +780,9 @@ next	./lib/mosquitto_internal.h	/^	struct _mosquitto_packet *next;$/;"	m	struct:
 next	./lib/mosquitto_internal.h	/^	struct mosquitto_message_all *next;$/;"	m	struct:mosquitto_message_all	typeref:struct:mosquitto_message_all::mosquitto_message_all
 next	./src/mosquitto_broker.h	/^	struct _mosquitto_acl *next;$/;"	m	struct:_mosquitto_acl	typeref:struct:_mosquitto_acl::_mosquitto_acl
 next	./src/mosquitto_broker.h	/^	struct _mosquitto_acl_user *next;$/;"	m	struct:_mosquitto_acl_user	typeref:struct:_mosquitto_acl_user::_mosquitto_acl_user
+next	./src/mosquitto_broker.h	/^	struct _mosquitto_auth_list * next ;$/;"	m	struct:_mosquitto_auth_list	typeref:struct:_mosquitto_auth_list::_mosquitto_auth_list
 next	./src/mosquitto_broker.h	/^	struct _mosquitto_subhier *next;$/;"	m	struct:_mosquitto_subhier	typeref:struct:_mosquitto_subhier::_mosquitto_subhier
 next	./src/mosquitto_broker.h	/^	struct _mosquitto_subleaf *next;$/;"	m	struct:_mosquitto_subleaf	typeref:struct:_mosquitto_subleaf::_mosquitto_subleaf
-next	./src/mosquitto_broker.h	/^	struct _mosquitto_waiting_auth_list * next ;$/;"	m	struct:_mosquitto_waiting_auth_list	typeref:struct:_mosquitto_waiting_auth_list::_mosquitto_waiting_auth_list
 next	./src/mosquitto_broker.h	/^	struct mosquitto_client_msg *next;$/;"	m	struct:mosquitto_client_msg	typeref:struct:mosquitto_client_msg::mosquitto_client_msg
 next	./src/mosquitto_broker.h	/^	struct mosquitto_msg_store *next;$/;"	m	struct:mosquitto_msg_store	typeref:struct:mosquitto_msg_store::mosquitto_msg_store
 next	./src/subs.c	/^	struct _sub_token *next;$/;"	m	struct:_sub_token	typeref:struct:_sub_token::_sub_token	file:
@@ -1018,6 +1018,7 @@ topics	./client/sub_client.c	/^	char **topics;$/;"	m	struct:userdata	file:
 topics	./src/mosquitto_broker.h	/^	struct _mqtt3_bridge_topic *topics;$/;"	m	struct:_mqtt3_bridge	typeref:struct:_mqtt3_bridge::_mqtt3_bridge_topic
 try_private	./src/mosquitto_broker.h	/^	bool try_private;$/;"	m	struct:_mqtt3_bridge
 try_private_accepted	./src/mosquitto_broker.h	/^	bool try_private_accepted;$/;"	m	struct:_mqtt3_bridge
+try_wakeup_finished_auth_connections	./src/read_handle_server.c	/^int try_wakeup_finished_auth_connections( struct mosquitto_db *db ){$/;"	f
 uint32_t	./src/uthash.h	/^typedef unsigned int uint32_t;$/;"	t
 uint8_t	./src/uthash.h	/^typedef unsigned char uint8_t;$/;"	t
 unpwd	./src/mosquitto_broker.h	/^	struct _mosquitto_unpwd *unpwd;$/;"	m	struct:mosquitto_db	typeref:struct:mosquitto_db::_mosquitto_unpwd
@@ -1043,7 +1044,6 @@ uthash_noexpand_fyi	./src/uthash.h	80;"	d
 value	./src/mosquitto_plugin.h	/^	char *value;$/;"	m	struct:mosquitto_auth_opt
 verbose	./client/sub_client.c	/^	int verbose;$/;"	m	struct:userdata	file:
 verbose	./src/mosquitto_broker.h	/^	bool verbose;$/;"	m	struct:mqtt3_config
-waiting_auth_list	./src/mosquitto_broker.h	/^	struct _mosquitto_waiting_auth_list *waiting_auth_list ;$/;"	m	struct:mosquitto_db	typeref:struct:mosquitto_db::_mosquitto_waiting_auth_list
-waiting_auth_list_mutex	./src/mosquitto_broker.h	/^	pthread_mutex_t waiting_auth_list_mutex;$/;"	m	struct:mosquitto_db
+waiting_auth_list	./src/mosquitto_broker.h	/^	struct _mosquitto_auth_list *waiting_auth_list ;$/;"	m	struct:mosquitto_db	typeref:struct:mosquitto_db::_mosquitto_auth_list
 will	./lib/mosquitto_internal.h	/^	struct mosquitto_message *will;$/;"	m	struct:mosquitto	typeref:struct:mosquitto::mosquitto_message
 write_e	./src/persist.h	46;"	d
